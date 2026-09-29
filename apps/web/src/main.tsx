@@ -2,7 +2,7 @@ import { StrictMode, Suspense, lazy, useEffect } from 'react';
 import { createRoot } from 'react-dom/client';
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom';
 import './index.css';
-import { api, basePath } from './lib/api';
+import { api, basePath, isDemo } from './lib/api';
 import { AppProvider, useApp } from './lib/app';
 import { Spinner } from './components/ui';
 import { PublicLayout } from './public/PublicLayout';
@@ -17,6 +17,7 @@ import { applyTheme, type ThemeSettings } from './features/theme';
 const SetupWizard = lazy(() => import('./setup/SetupWizard').then((m) => ({ default: m.SetupWizard })));
 const AdminApp = lazy(() => import('./admin/AdminApp'));
 const MapPage = lazy(() => import('./features/mapPages').then((m) => ({ default: m.MapPage })));
+const DemoBar = isDemo ? lazy(() => import('./demo/DemoBar')) : null;
 
 /** Applique le thème avancé (police, fond, CSS personnalisé) choisi dans le panel. */
 function ThemeLoader() {
@@ -84,6 +85,11 @@ createRoot(document.getElementById('root')!).render(
   <StrictMode>
     <BrowserRouter basename={basePath.replace(/\/$/, '') || '/'}>
       <AppProvider fallback={<Spinner />}>
+        {DemoBar && (
+          <Suspense fallback={null}>
+            <DemoBar />
+          </Suspense>
+        )}
         <AppRoutes />
       </AppProvider>
     </BrowserRouter>

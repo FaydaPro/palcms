@@ -4,8 +4,11 @@ declare global {
   }
 }
 
+/** Build de démo (GitHub Pages) : pas de serveur, l'API est simulée dans le navigateur. */
+export const isDemo = import.meta.env.VITE_DEMO === '1';
+
 /** Chemin sous lequel le site est servi ("/" ou "/cms/"), injecté par le serveur. */
-export const basePath = window.__PALCMS__?.basePath ?? '/';
+export const basePath = isDemo ? import.meta.env.BASE_URL : (window.__PALCMS__?.basePath ?? '/');
 
 /** URL absolue d'une ressource du site : url("api/x") -> "/cms/api/x". */
 export const url = (path: string) => basePath + path.replace(/^\/+/, '');
@@ -27,6 +30,14 @@ export class ApiError extends Error {
 }
 
 async function request<T>(method: string, path: string, body?: unknown): Promise<T> {
+  if (isDemo) {
+    const { demoRequest } = await import('../demo/engine');
+    try {
+      return await demoRequest<T>(method, path, body);
+    } catch (e) {
+      throw new ApiError((e as Error).message, (e as { status?: number }).status ?? 500);
+    }
+  }
   const res = await fetch(url(`api/${path}`), {
     method,
     credentials: 'same-origin',

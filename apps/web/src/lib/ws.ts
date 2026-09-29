@@ -1,6 +1,6 @@
 import { useEffect, useRef } from 'react';
 import type { Channel, WsServerMessage } from '@palcms/shared';
-import { url } from './api';
+import { isDemo, url } from './api';
 
 type Listener = (msg: WsServerMessage) => void;
 
@@ -14,7 +14,19 @@ class RealtimeClient {
   private retry = 0;
   private timer: number | null = null;
 
+  private demoOff: (() => void) | null = null;
+
   private connect() {
+    if (isDemo) {
+      if (!this.demoOff) {
+        void import('../demo/engine').then(({ onDemoMessage }) => {
+          this.demoOff ??= onDemoMessage((msg) => {
+            for (const set of this.listeners.values()) for (const l of set) l(msg);
+          });
+        });
+      }
+      return;
+    }
     if (this.socket && this.socket.readyState <= WebSocket.OPEN) return;
     const proto = location.protocol === 'https:' ? 'wss:' : 'ws:';
     const ws = new WebSocket(`${proto}//${location.host}${url('ws')}`);

@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.0.1
+
+- Démo en ligne sur GitHub Pages : le site public et le panel admin avec des données fictives, sans serveur. Mise à jour automatique à chaque push sur `main`
+- Captures d'écran dans le README
+
 ## 1.0.0
 
 Première version.

@@ -10,6 +10,18 @@
 
 Licence **MIT**, voir [LICENSE](LICENSE). Historique des versions : [CHANGELOG.md](CHANGELOG.md).
 
+## Démo
+
+👉 **[Essayer la démo](https://faydapro.github.io/palcms/)** · [ouvrir directement le panel admin](https://faydapro.github.io/palcms/admin)
+
+La démo tourne entièrement dans le navigateur avec des données fictives (joueurs simulés, pas de vrai serveur Palworld). Tu peux tout modifier : les changements restent sur ton navigateur et le bouton « Réinitialiser » remet tout à zéro.
+
+| Site public | Carte en direct |
+|---|---|
+| ![Accueil](docs/screenshots/accueil.png) | ![Carte](docs/screenshots/carte.png) |
+| **Classement** | **Panel admin** |
+| ![Classement](docs/screenshots/classement.png) | ![Panel admin](docs/screenshots/admin.png) |
+
 ---
 
 ## Installation sur un VPS
@@ -109,6 +121,9 @@ Le jeton d'installation s'affiche dans la console. Le faux `palctl` (`tools/fake
 | `pnpm typecheck` | vérification TypeScript |
 | `pnpm dev:reset` | repartir d'une installation vierge |
 | `pnpm release` | construit `release/palcms.tar.gz` et `release/install.sh` |
+| `pnpm --filter @palcms/web dev:demo` | lance la démo (sans serveur) sur http://localhost:5173/palcms/ |
+
+La démo (`apps/web/src/demo`) remplace l'API par un faux serveur dans le navigateur. Elle est publiée sur GitHub Pages à chaque push sur `main` (workflow `demo.yml`) et n'est pas incluse dans le site installé sur un VPS.
 
 Tester une archive sur un VPS : `sudo bash install.sh --from-local palcms.tar.gz`.
 
@@ -128,6 +143,7 @@ apps/server                API Fastify + SQLite
                            RCON, Discord, équipe et rôles, journal, thèmes
 apps/web                   React + Tailwind : assistant, site public, panel admin
   src/features             écrans correspondants
+  src/demo                 faux serveur de la démo en ligne
 packages/shared            types, schémas de validation, permissions, conversions de la carte
 tools/                     faux palctl et faux serveur Palworld pour le développement
 ```
