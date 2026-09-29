@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.0.2
+
+- Installation : sur un VPS tout neuf, le script attend la fin des mises à jour automatiques d'Ubuntu au lieu de s'arrêter sur « Could not get lock /var/lib/dpkg/lock-frontend »
+
 ## 1.0.1
 
 - Démo en ligne sur GitHub Pages : le site public et le panel admin avec des données fictives, sans serveur. Mise à jour automatique à chaque push sur `main`

@@ -17,6 +17,8 @@ STEAMCMD=/usr/games/steamcmd
 APP_ID=2394010
 
 die() { echo "palctl: $*" >&2; exit 2; }
+# Attend qu'une mise à jour automatique d'Ubuntu libère apt au lieu d'échouer
+apt-get() { command apt-get -o DPkg::Lock::Timeout=600 "$@"; }
 is_port() { [[ "$1" =~ ^[0-9]{4,5}$ ]] && (( 10#$1 >= 1024 && 10#$1 <= 65535 )); }
 is_players() { [[ "$1" =~ ^[0-9]{1,2}$ ]] && (( 10#$1 >= 1 && 10#$1 <= 32 )); }
 is_lines() { [[ "$1" =~ ^[0-9]{1,4}$ ]] && (( 10#$1 >= 1 && 10#$1 <= 2000 )); }

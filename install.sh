@@ -77,6 +77,16 @@ disk_gb=$(df -BG --output=avail / | tail -1 | tr -dc '0-9')
 
 # Paquets de base
 step "Installation des paquets de base"
+# Sur un VPS tout neuf, Ubuntu fait ses mises à jour automatiques au démarrage et bloque apt
+# pendant quelques minutes : on attend au lieu d'échouer.
+apt_busy() { fuser /var/lib/dpkg/lock-frontend /var/lib/dpkg/lock /var/lib/apt/lists/lock >/dev/null 2>&1; }
+if apt_busy; then
+  info "Ubuntu installe des mises à jour en arrière-plan, on attend qu'il ait fini..."
+  for _ in $(seq 1 120); do apt_busy || break; sleep 5; done
+  apt_busy && die "apt est toujours occupé après 10 minutes. Réessaie un peu plus tard."
+fi
+# Au cas où une mise à jour démarre pendant l'installation
+apt-get() { command apt-get -o DPkg::Lock::Timeout=600 "$@"; }
 apt-get update -qq
 apt-get install -y -qq curl ca-certificates tar gnupg openssl sudo software-properties-common >/dev/null
 info "OK"
