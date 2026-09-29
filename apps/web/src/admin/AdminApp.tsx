@@ -7,6 +7,17 @@ import { AppearancePage, MembersPage, MenuPage, ModulesPage } from './site';
 import { AccountPage } from './misc';
 import { AnnouncementsPage, BackupsPage, ModerationPage, RconPage, SchedulesPage } from '../features/admin-server';
 import { AuditPage, DiscordPage, MapAdminPage, TeamPage, ThemesPage } from '../features/admin-site';
+import {
+  AntiCheatPage,
+  EventsPage,
+  MonitoringPage,
+  SanctionsPage,
+  StatsPage,
+  TicketsAdminPage,
+  UpdatesPage,
+  WorldPage,
+  WorldPlayerPage,
+} from '../features/admin-v11';
 
 /** Panel admin, chargé à la demande : le site public ne télécharge jamais l'éditeur ni les écrans admin. */
 export default function AdminApp() {
@@ -24,6 +35,15 @@ export default function AdminApp() {
         <Route path="serveur/annonces" element={<AnnouncementsPage />} />
         <Route path="serveur/moderation" element={<ModerationPage />} />
         <Route path="serveur/rcon" element={<RconPage />} />
+        <Route path="serveur/surveillance" element={<MonitoringPage />} />
+        <Route path="serveur/statistiques" element={<StatsPage />} />
+        <Route path="serveur/monde" element={<WorldPage />} />
+        <Route path="serveur/monde/:id" element={<WorldPlayerPage />} />
+        <Route path="serveur/evenements" element={<EventsPage />} />
+        <Route path="serveur/anti-triche" element={<AntiCheatPage />} />
+        <Route path="serveur/sanctions" element={<SanctionsPage />} />
+        <Route path="site/signalements" element={<TicketsAdminPage />} />
+        <Route path="mises-a-jour" element={<UpdatesPage />} />
         <Route path="site/pages" element={<PagesList />} />
         <Route path="site/pages/:id" element={<PageEditor />} />
         <Route path="site/actualites" element={<NewsAdminList />} />

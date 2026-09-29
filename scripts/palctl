@@ -25,6 +25,10 @@ is_lines() { [[ "$1" =~ ^[0-9]{1,4}$ ]] && (( 10#$1 >= 1 && 10#$1 <= 2000 )); }
 is_backup() { [[ "$1" =~ ^palworld-[0-9]{8}-[0-9]{6}-(manual|auto|prerestart|preupdate|prerestore)\.tar\.gz$ ]]; }
 BACKUP_DIR=/var/lib/palworld-backups
 SAVE_DIR="$PAL_DIR/Pal/Saved/SaveGames"
+# Lecture des sauvegardes du monde : sav_cli de palworld-server-tool (Apache-2.0), version et empreinte figées.
+PST_VERSION=v0.12.2
+PST_SHA256=831c87f3df171a1d63ddeb4e231b5427ead262cbc6466e0ff196ff08a6b35304
+SAV_CLI=/usr/local/lib/palcms/sav_cli
 nargs() { (( $1 == $2 )) || die "nombre d'arguments invalide"; }
 
 [[ $EUID -eq 0 ]] || die "doit être lancé en root (via sudo)"
@@ -226,6 +230,67 @@ EOF
     is_backup "$1" || die "nom de sauvegarde invalide"
     [[ -f "$BACKUP_DIR/$1" ]] || die "sauvegarde introuvable"
     exec cat "$BACKUP_DIR/$1"
+    ;;
+
+  savtools-install)
+    nargs $# 0
+    dl=$(mktemp -d)
+    trap 'rm -rf "$dl"' EXIT
+    echo "==> Téléchargement de sav_cli (palworld-server-tool $PST_VERSION)"
+    curl -fsSL --retry 3 -o "$dl/pst.tar.gz" \
+      "https://github.com/zaigie/palworld-server-tool/releases/download/$PST_VERSION/pst_${PST_VERSION}_linux_x86_64.tar.gz"
+    echo "$PST_SHA256  $dl/pst.tar.gz" | sha256sum -c --quiet - || die "empreinte de l'archive invalide"
+    tar -xzf "$dl/pst.tar.gz" -C "$dl" sav_cli
+    install -d -m 0755 -o root -g root "$(dirname "$SAV_CLI")"
+    install -m 0755 -o root -g root "$dl/sav_cli" "$SAV_CLI"
+    echo "✔ sav_cli installé"
+    ;;
+
+  savtools-status)
+    nargs $# 0
+    [[ -x "$SAV_CLI" ]] && echo "installed $PST_VERSION" || echo "missing"
+    ;;
+
+  world-export)
+    nargs $# 0
+    [[ -x "$SAV_CLI" ]] || die "sav_cli absent (lancer savtools-install)"
+    level=$(find "$SAVE_DIR" -mindepth 3 -maxdepth 3 -name Level.sav -printf '%T@ %p\n' 2>/dev/null | sort -rn | head -n1 | cut -d' ' -f2-)
+    [[ -n "$level" ]] || die "aucun monde sauvegardé (Level.sav introuvable)"
+    work=$(mktemp -d)
+    trap 'rm -rf "$work"' EXIT
+    # On travaille sur une copie : le serveur peut réécrire ses fichiers pendant la lecture.
+    world_dir=$(dirname "$level")
+    cp "$level" "$work/Level.sav"
+    [[ -d "$world_dir/Players" ]] && cp -r "$world_dir/Players" "$work/Players"
+    chown -R "$STEAM_USER:$STEAM_USER" "$work"
+    (cd "$work" && timeout 900 nice -n 10 sudo -u "$STEAM_USER" -H "$SAV_CLI" -f "$work/Level.sav" -o "$work/structure.json" >"$work/sav_cli.log" 2>&1) \
+      || { tail -n 20 "$work/sav_cli.log" >&2; die "lecture de la sauvegarde impossible"; }
+    cat "$work/structure.json"
+    ;;
+
+  check-update)
+    nargs $# 0
+    manifest="$PAL_DIR/steamapps/appmanifest_$APP_ID.acf"
+    installed=$(awk -F'"' '/"buildid"/ {print $4; exit}' "$manifest" 2>/dev/null || true)
+    latest=$(sudo -u "$STEAM_USER" -H "$STEAMCMD" +login anonymous +app_info_update 1 +app_info_print "$APP_ID" +quit 2>/dev/null \
+      | awk -F'"' '/"branches"/ {b=1} b && /"public"/ {p=1} p && /"buildid"/ {print $4; exit}')
+    echo "installed=${installed:-}"
+    echo "latest=${latest:-}"
+    ;;
+
+  self-update)
+    nargs $# 1
+    [[ "$1" =~ ^v[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}$ ]] || die "version invalide"
+    repo=$(sed -n 's/^PALCMS_REPO="\${PALCMS_REPO:-\([A-Za-z0-9_.-]*\/[A-Za-z0-9_.-]*\)}"$/\1/p' /opt/palcms/install.sh | head -n1)
+    [[ -n "$repo" ]] || die "dépôt GitHub introuvable dans /opt/palcms/install.sh"
+    # Dossier réservé à root : le CMS ne doit pas pouvoir remplacer le script avant son exécution.
+    script=$(mktemp /root/palcms-update.XXXXXX)
+    curl -fsSL --retry 3 -o "$script" "https://github.com/$repo/releases/download/$1/install.sh" || die "téléchargement de la version $1 impossible"
+    head -n1 "$script" | grep -q '^#!/usr/bin/env bash' || die "script d'installation invalide"
+    # L'installation redémarre PalCMS : elle tourne dans son propre service pour ne pas être coupée.
+    systemd-run --unit="palcms-update-$(date +%s)" --collect --setenv=PALCMS_VERSION="$1" --setenv=PALCMS_REPO="$repo" \
+      /bin/bash "$script" -y
+    echo "==> Mise à jour vers $1 lancée"
     ;;
 
   *)

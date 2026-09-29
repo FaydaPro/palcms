@@ -1,18 +1,59 @@
-import { useState } from 'react';
-import { Link } from 'react-router-dom';
+import { useEffect, useMemo, useState } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
 import { Map as MapIcon, Users } from 'lucide-react';
 import * as ui from '../components/ui';
+import { api } from '../lib/api';
 import { useApp } from '../lib/app';
 import { useMapData } from './components';
-import { LiveMap, POI_ICONS, type MapPlayer } from './map/LiveMap';
+import { LiveMap, POI_ICONS, type MapLayers, type MapPlayer } from './map/LiveMap';
 
 const { Badge, Card, Empty, Spinner, Alert } = ui;
 
 // Carte publique
 
+const LAYER_LABELS: { id: keyof MapLayers; label: string }[] = [
+  { id: 'bases', label: '🏰 Bases des guildes' },
+  { id: 'fastTravel', label: '🔵 Voyage rapide' },
+  { id: 'bossTowers', label: '🗼 Tours de boss' },
+];
+
+/** Calques de la carte (bases, voyage rapide, tours), avec le choix de l'utilisateur mémorisé. */
+export function useMapLayers() {
+  const [all, setAll] = useState<MapLayers | null>(null);
+  const [shown, setShown] = useState<Record<string, boolean>>(() => {
+    try {
+      return JSON.parse(localStorage.getItem('palcms-map-layers') ?? '') as Record<string, boolean>;
+    } catch {
+      return { bases: true, fastTravel: false, bossTowers: true };
+    }
+  });
+  useEffect(() => {
+    api
+      .get<MapLayers>('features/world/map')
+      .then(setAll)
+      .catch(() => setAll(null));
+  }, []);
+  const toggle = (id: string, v: boolean) => {
+    const next = { ...shown, [id]: v };
+    setShown(next);
+    try {
+      localStorage.setItem('palcms-map-layers', JSON.stringify(next));
+    } catch {
+      // préférence non mémorisée, sans conséquence
+    }
+  };
+  const layers = useMemo<MapLayers | undefined>(
+    () => (all ? Object.fromEntries(LAYER_LABELS.filter((l) => shown[l.id]).map((l) => [l.id, all[l.id] ?? []])) : undefined),
+    [all, shown],
+  );
+  return { all, shown, toggle, layers };
+}
+
 export function MapPage() {
   const { data, players, error } = useMapData('public');
   const [focus, setFocus] = useState<{ x: number; y: number } | null>(null);
+  const { all, shown, toggle, layers } = useMapLayers();
+  const navigate = useNavigate();
   if (error) {
     return (
       <div className="mx-auto max-w-6xl px-4 py-10">
@@ -32,9 +73,28 @@ export function MapPage() {
       </div>
       <div className="grid gap-6 lg:grid-cols-[1fr_280px]">
         <div className="overflow-hidden rounded-xl ring-1 ring-slate-200 dark:ring-slate-800">
-          <LiveMap data={data} players={players} height="min(75vh, 760px)" focus={focus} />
+          <LiveMap
+            data={data}
+            players={players}
+            height="min(75vh, 760px)"
+            focus={focus}
+            layers={layers}
+            onBaseClick={(id) => navigate(`/guildes/${id}`)}
+          />
         </div>
         <div className="space-y-6">
+          {all && (
+            <Card title="Afficher">
+              <div className="space-y-2">
+                {LAYER_LABELS.filter((l) => (all[l.id]?.length ?? 0) > 0).map((l) => (
+                  <label key={l.id} className="flex cursor-pointer items-center gap-2 text-sm">
+                    <input type="checkbox" checked={!!shown[l.id]} onChange={(e) => toggle(l.id, e.target.checked)} className="accent-[var(--accent)]" />
+                    {l.label}
+                  </label>
+                ))}
+              </div>
+            </Card>
+          )}
           <Card
             title={
               <span className="flex items-center gap-2">

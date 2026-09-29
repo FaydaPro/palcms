@@ -41,11 +41,17 @@ export function PublicLayout() {
     navigate('/');
   };
 
-  const menu = site.menu.filter((m) => {
-    if (m.url === '/actualites') return modules.news;
-    if (m.url === '/classement') return modules.leaderboard;
-    return true;
-  });
+  // Un lien vers une page dont le module est désactivé est masqué du menu.
+  const MODULE_OF: Record<string, string> = {
+    '/actualites': 'news',
+    '/classement': 'leaderboard',
+    '/guildes': 'guilds',
+    '/paldex': 'paldex',
+    '/evenements': 'calendar',
+    '/disponibilite': 'uptime',
+    '/signaler': 'tickets',
+  };
+  const menu = site.menu.filter((m) => !MODULE_OF[m.url] || modules[MODULE_OF[m.url]]);
 
   return (
     <div className="flex min-h-screen flex-col">
@@ -107,6 +113,20 @@ export function PublicLayout() {
 
       <footer className="border-t border-slate-200 py-8 text-center text-sm text-slate-500 dark:border-slate-800">
         <p>{site.footerText || `© ${new Date().getFullYear()} ${site.name}`}</p>
+        {(modules.uptime || modules.tickets) && (
+          <p className="mt-2 flex justify-center gap-4">
+            {modules.uptime && (
+              <Link to="/disponibilite" className="hover:text-accent">
+                Disponibilité du serveur
+              </Link>
+            )}
+            {modules.tickets && (
+              <Link to="/signaler" className="hover:text-accent">
+                Signaler un problème
+              </Link>
+            )}
+          </p>
+        )}
         <p className="mt-1 text-xs opacity-70">Propulsé par PalCMS · Palworld est une marque de Pocketpair, Inc.</p>
       </footer>
     </div>

@@ -10,6 +10,7 @@ import { LeaderboardTable, OnlinePlayers, ServerStatusCard } from '../components
 import { Card } from '../components/ui';
 
 const MapWidget = lazy(() => import('../features/mapPages').then((m) => ({ default: m.MapWidget })));
+const EventBanner = lazy(() => import('../features/world-public').then((m) => ({ default: m.EventBanner })));
 
 export function Home() {
   const { boot } = useApp();
@@ -53,6 +54,11 @@ export function Home() {
       </section>
 
       <div className="mx-auto max-w-6xl space-y-8 px-4 pb-16">
+        {modules.calendar && (
+          <Suspense fallback={null}>
+            <EventBanner />
+          </Suspense>
+        )}
         {modules.status && (
           <div className="grid gap-6 md:grid-cols-[minmax(0,1fr)_minmax(0,1.4fr)]">
             <ServerStatusCard status={live.status} />

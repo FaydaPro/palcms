@@ -414,7 +414,7 @@ interface OnlinePlayer {
 
 export function ModerationPage() {
   const players = useLoad<{ online: OnlinePlayer[]; history: { uid: string; name: string }[] }>('admin/server/players');
-  const bans = useLoad<{ uid: string; name: string; reason: string; bannedAt: number; bannedBy: string }[]>('features/bans');
+  const bans = useLoad<{ uid: string; name: string; reason: string; bannedAt: number; bannedBy: string; expiresAt: number | null }[]>('features/bans');
   const wl = useLoad<{ settings: { enabled: boolean; message: string }; entries: { uid: string; name: string; addedAt: number; addedBy: string }[] }>('features/whitelist');
   const [wlForm, setWlForm] = useState<{ enabled: boolean; message: string } | null>(null);
   const [addUid, setAddUid] = useState('');
@@ -484,6 +484,7 @@ export function ModerationPage() {
                     <p className="text-xs text-slate-500">
                       {b.reason || 'Sans raison'} · par {b.bannedBy} · {format.formatDate(b.bannedAt)}
                     </p>
+                    {b.expiresAt && <Badge tone="amber">Jusqu’au {format.formatDateTime(b.expiresAt)}</Badge>}
                   </div>
                   <Button
                     variant="secondary"

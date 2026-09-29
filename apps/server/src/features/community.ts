@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import type { HostUser, FeatureHost } from '@palcms/shared';
 import { rconCommand } from './rcon';
+import { recordSanction } from './sanctions';
 import { errorText, httpError, parseBody, type Feature, type FeatureBus } from './util';
 
 const audit = (host: FeatureHost, user: HostUser | null, action: string, target?: string, details?: unknown) =>
@@ -51,6 +52,7 @@ export function createModeration(host: FeatureHost): Feature {
         handler: async ({ params, body, user }) => {
           const { message } = parseBody(z.object({ message: z.string().trim().max(200).default('Expulsé par un administrateur') }), body);
           await host.palworld.kick(params.uid, message);
+          recordSanction(host, params.uid, nameOf(params.uid), 'kick', message, user!.username);
           audit(host, user, 'player.kick', nameOf(params.uid), { message });
           return { ok: true };
         },
@@ -65,8 +67,9 @@ export function createModeration(host: FeatureHost): Feature {
           await host.palworld.ban(params.uid, reason || 'Banni par un administrateur');
           db.prepare(
             `INSERT INTO pro_bans (uid, name, reason, banned_at, banned_by) VALUES (?, ?, ?, ?, ?)
-             ON CONFLICT(uid) DO UPDATE SET reason = excluded.reason, banned_at = excluded.banned_at, banned_by = excluded.banned_by`,
+             ON CONFLICT(uid) DO UPDATE SET reason = excluded.reason, banned_at = excluded.banned_at, banned_by = excluded.banned_by, expires_at = NULL`,
           ).run(params.uid, nameOf(params.uid), reason, Date.now(), user!.username);
+          recordSanction(host, params.uid, nameOf(params.uid), 'ban', reason, user!.username);
           audit(host, user, 'player.ban', nameOf(params.uid), { reason });
           return { ok: true };
         },
@@ -76,7 +79,8 @@ export function createModeration(host: FeatureHost): Feature {
         path: 'bans',
         access: 'staff',
         permission: 'server.moderation',
-        handler: () => db.prepare('SELECT uid, name, reason, banned_at AS bannedAt, banned_by AS bannedBy FROM pro_bans ORDER BY banned_at DESC').all(),
+        handler: () =>
+          db.prepare('SELECT uid, name, reason, banned_at AS bannedAt, banned_by AS bannedBy, expires_at AS expiresAt FROM pro_bans ORDER BY banned_at DESC').all(),
       },
       {
         method: 'DELETE',
@@ -86,6 +90,7 @@ export function createModeration(host: FeatureHost): Feature {
         handler: async ({ params, user }) => {
           await host.palworld.unban(params.uid);
           db.prepare('DELETE FROM pro_bans WHERE uid = ?').run(params.uid);
+          recordSanction(host, params.uid, nameOf(params.uid), 'unban', '', user!.username);
           audit(host, user, 'player.unban', nameOf(params.uid));
           return { ok: true };
         },
@@ -217,9 +222,9 @@ export function createRcon(host: FeatureHost): Feature {
 
 interface DiscordSettings {
   webhookUrl: string;
-  events: { server: boolean; schedule: boolean; content: boolean };
+  events: { server: boolean; schedule: boolean; content: boolean; alerts: boolean };
 }
-const DEFAULT_DISCORD: DiscordSettings = { webhookUrl: '', events: { server: true, schedule: true, content: true } };
+const DEFAULT_DISCORD: DiscordSettings = { webhookUrl: '', events: { server: true, schedule: true, content: true, alerts: true } };
 const WEBHOOK_RE = /^https:\/\/(?:ptb\.|canary\.)?(?:discord|discordapp)\.com\/api\/webhooks\/\d+\/[\w-]+$/;
 
 const COLORS = { green: 0x22c55e, red: 0xef4444, amber: 0xf59e0b, blue: 0x3b82f6, purple: 0xa855f7 };
@@ -303,6 +308,31 @@ export function createDiscord(host: FeatureHost, bus: FeatureBus): Feature {
           'news:published',
           on(() => ev().content, (d) => send(`📰 ${d.title}`, 'Nouvel article sur le site !', COLORS.purple, siteUrl(`actualites/${d.slug}`))),
         ),
+        // Le crash a déjà son propre message (server:offline) : on ne le double pas.
+        bus.on(
+          'alert',
+          on(
+            () => ev().alerts,
+            (d) => d.kind !== 'crash' && send(d.level === 'critical' ? '🚨 Alerte critique' : '⚠️ Alerte', d.message, d.level === 'critical' ? COLORS.red : COLORS.amber, siteUrl('admin/serveur/surveillance')),
+          ),
+        ),
+        bus.on(
+          'flag:new',
+          on(() => ev().alerts, (d) => send('🕵️ Soupçon de triche', `**${d.name}** : ${d.details}`, COLORS.red, siteUrl('admin/serveur/anti-triche'))),
+        ),
+        bus.on(
+          'update:available',
+          on(() => ev().alerts, (d) => send('⬆️ Mise à jour disponible', `PalCMS ${d.latest} est disponible (version actuelle : ${d.current}).`, COLORS.blue, siteUrl('admin/mises-a-jour'))),
+        ),
+        bus.on('event:started', on(() => ev().schedule, (d) => send('🎉 Événement commencé', `**${d.name}** a commencé !`, COLORS.purple, siteUrl('evenements')))),
+        bus.on('event:ended', on(() => ev().schedule, (d) => send('🏁 Événement terminé', `**${d.name}** est terminé.`, COLORS.blue))),
+        bus.on(
+          'ticket:new',
+          on(
+            () => ev().content,
+            (d) => send(d.kind === 'report' ? '🚩 Nouveau signalement' : '💡 Nouvelle suggestion', `**${d.subject}** (par ${d.username})`, COLORS.amber, siteUrl('admin/site/signalements')),
+          ),
+        ),
         host.events.on(
           'member:pending',
           on(
@@ -335,7 +365,7 @@ export function createDiscord(host: FeatureHost, bus: FeatureBus): Feature {
           const b = parseBody(
             z.object({
               webhookUrl: z.string().trim().max(300).optional(),
-              events: z.object({ server: z.boolean(), schedule: z.boolean(), content: z.boolean() }),
+              events: z.object({ server: z.boolean(), schedule: z.boolean(), content: z.boolean(), alerts: z.boolean().default(true) }),
             }),
             body,
           );

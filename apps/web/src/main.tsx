@@ -1,4 +1,4 @@
-import { StrictMode, Suspense, lazy, useEffect } from 'react';
+import { StrictMode, Suspense, lazy, useEffect, type ReactNode } from 'react';
 import { createRoot } from 'react-dom/client';
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom';
 import './index.css';
@@ -18,6 +18,15 @@ const SetupWizard = lazy(() => import('./setup/SetupWizard').then((m) => ({ defa
 const AdminApp = lazy(() => import('./admin/AdminApp'));
 const MapPage = lazy(() => import('./features/mapPages').then((m) => ({ default: m.MapPage })));
 const DemoBar = isDemo ? lazy(() => import('./demo/DemoBar')) : null;
+const world = () => import('./features/world-public');
+const GuildsPage = lazy(() => world().then((m) => ({ default: m.GuildsPage })));
+const GuildPage = lazy(() => world().then((m) => ({ default: m.GuildPage })));
+const PaldexPage = lazy(() => world().then((m) => ({ default: m.PaldexPage })));
+const CalendarPage = lazy(() => world().then((m) => ({ default: m.CalendarPage })));
+const UptimePage = lazy(() => world().then((m) => ({ default: m.UptimePage })));
+const TicketsPage = lazy(() => world().then((m) => ({ default: m.TicketsPage })));
+
+const lazyPage = (el: ReactNode) => <Suspense fallback={<Spinner />}>{el}</Suspense>;
 
 /** Applique le thème avancé (police, fond, CSS personnalisé) choisi dans le panel. */
 function ThemeLoader() {
@@ -61,6 +70,12 @@ function AppRoutes() {
             }
           />
           <Route path="joueurs/:id" element={<PlayerPage />} />
+          {m.guilds && <Route path="guildes" element={lazyPage(<GuildsPage />)} />}
+          {m.guilds && <Route path="guildes/:id" element={lazyPage(<GuildPage />)} />}
+          {m.paldex && <Route path="paldex" element={lazyPage(<PaldexPage />)} />}
+          {m.calendar && <Route path="evenements" element={lazyPage(<CalendarPage />)} />}
+          {m.uptime && <Route path="disponibilite" element={lazyPage(<UptimePage />)} />}
+          {m.tickets && <Route path="signaler" element={lazyPage(<TicketsPage />)} />}
           <Route path="p/:slug" element={<CmsPage />} />
           <Route path="connexion" element={<LoginPage />} />
           <Route path="inscription" element={<RegisterPage />} />

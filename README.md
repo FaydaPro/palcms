@@ -2,10 +2,11 @@
 
 **CMS open source et gratuit pour serveur dédié Palworld.** Une commande sur un VPS installe le site. Le site installe ensuite le serveur de jeu, puis offre :
 
-- **un site public de serveur de jeu** : accueil, actualités, pages, statut et joueurs en direct, **carte en temps réel**, **classement**, profils de joueurs avec graphiques, comptes joueurs (Steam ou email) ;
+- **un site public de serveur de jeu** : accueil, actualités, pages, statut et joueurs en direct, **carte en temps réel** (joueurs, bases, voyage rapide), **classement**, **guildes**, **Paldex du serveur**, **calendrier des événements**, page de **disponibilité**, profils de joueurs avec graphiques, comptes joueurs (Steam ou email) avec leurs Pals et leur inventaire, **signalements et suggestions** ;
 - **un panel admin** en deux espaces :
-  - **Gestion du serveur** : tableau de bord, démarrer / arrêter / redémarrer, éditeur de `PalWorldSettings.ini`, joueurs, logs en direct, sauvegardes, redémarrages programmés et mises à jour, annonces en jeu, modération, console RCON ;
-  - **Gestion du site** : pages, actualités, menu, apparence et thèmes, carte, Discord, modules, membres ;
+  - **Gestion du serveur** : tableau de bord, **surveillance** (jauges, alertes, historique), **statistiques de fréquentation**, démarrer / arrêter / redémarrer, éditeur de `PalWorldSettings.ini`, **événements et préréglages**, joueurs, **données du monde** (inventaires, Pals, guildes, recherche d'objets), logs en direct, sauvegardes, redémarrages programmés, **mises à jour automatiques du serveur**, annonces en jeu, modération, **sanctions**, **anti-triche**, console RCON ;
+  - **Gestion du site** : pages, actualités, menu, apparence et thèmes, carte, Discord (notifications et alertes), modules, membres, signalements ;
+- **mise à jour de PalCMS en un clic** depuis le panel ;
 - **une équipe avec des rôles** (Administrateur, Modérateur, Rédacteur, rôles personnalisés) et un **journal des actions**.
 
 Licence **MIT**, voir [LICENSE](LICENSE). Historique des versions : [CHANGELOG.md](CHANGELOG.md).

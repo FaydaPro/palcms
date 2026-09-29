@@ -17,6 +17,83 @@ const die = (msg, code = 2) => {
   process.exit(code);
 };
 
+// Monde simulé au format de sav_cli, cohérent avec les joueurs du faux serveur (tools/fake-palworld-api).
+const PLAYER_NAMES = ['Lyra', 'Kaito', 'Nova', 'Bastien', 'Mira', 'Oskar', 'Zelie', 'Tanuki'];
+const PAL_TYPES = ['SheepBall', 'PinkCat', 'ChickenPal', 'Kitsunebi', 'Penguin', 'Carbunclo', 'Anubis', 'BOSS_Anubis', 'JetDragon', 'Garm', 'WoolFox', 'Mutant', 'FlameBuffalo', 'LazyDragon', 'ThunderDragonMan', 'HadesBird', 'SakuraSaurus', 'Alpaca', 'GrassMammoth', 'NightFox'];
+const PASSIVES = ['Rare', 'Legend', 'CraftSpeed_up2', 'PAL_ALLAttack_up2', 'Deffence_up1', 'ElementBoost_Fire_2_PAL', 'Nocturnal', 'TrainerMining_up1'];
+const ITEMS = [['money', 50000], ['stone', 900], ['wood', 700], ['palsphere', 40], ['palsphere_mega', 15], ['copperingot', 120], ['berries', 60], ['honey', 12], ['palfluid', 30], ['cloth', 80]];
+
+function fakeWorld() {
+  let seed = 1234;
+  const rnd = () => ((seed = (seed * 1664525 + 1013904223) % 4294967296) / 4294967296);
+  const players = PLAYER_NAMES.map((name, i) => {
+    const level = 8 + Math.floor(rnd() * 42);
+    const pals = Array.from({ length: 4 + Math.floor(rnd() * 22) }, () => ({
+      nickname: rnd() < 0.15 ? `${name.slice(0, 3)}${Math.floor(rnd() * 90 + 10)}` : '',
+      level: 1 + Math.floor(rnd() * level),
+      exp: 0,
+      hp: 500,
+      max_hp: 0,
+      type: PAL_TYPES[Math.floor(rnd() * PAL_TYPES.length)],
+      gender: rnd() < 0.5 ? 'Male' : 'Female',
+      is_lucky: rnd() < 0.05,
+      is_boss: false,
+      is_tower: false,
+      workspeed: 70,
+      melee: Math.floor(rnd() * 100),
+      ranged: Math.floor(rnd() * 100),
+      defense: Math.floor(rnd() * 100),
+      rank: 1 + Math.floor(rnd() * 4),
+      rank_attack: 0,
+      rank_defence: 0,
+      rank_craftspeed: 0,
+      skills: PASSIVES.filter(() => rnd() < 0.2),
+    }));
+    for (const p of pals) p.is_boss = p.type.startsWith('BOSS_');
+    const common = ITEMS.filter(() => rnd() < 0.7).map(([id, max], slot) => ({ SlotIndex: slot, ItemId: id, StackCount: 1 + Math.floor(rnd() * max) }));
+    // Nova a un stock anormal : l'anti-triche doit la repérer.
+    if (name === 'Nova') common.push({ SlotIndex: 20, ItemId: 'palsphere_legend', StackCount: 45000 });
+    return {
+      player_uid: String(0xa1b2c3 + i),
+      nickname: name,
+      level,
+      exp: level * 1000,
+      hp: 50000,
+      max_hp: 0,
+      shield_hp: 0,
+      shield_max_hp: 0,
+      max_status_point: 0,
+      status_point: { 最大HP: Math.floor(rnd() * 20), 最大SP: Math.floor(rnd() * 10), 攻撃力: Math.floor(rnd() * 15), 所持重量: Math.floor(rnd() * 20) },
+      full_stomach: 80,
+      pals,
+      items: {
+        CommonContainerId: common,
+        EssentialContainerId: [{ SlotIndex: 0, ItemId: 'glider_good', StackCount: 1 }],
+        WeaponLoadOutContainerId: [{ SlotIndex: 0, ItemId: 'assaultrifle_default1', StackCount: 1 }],
+        PlayerEquipArmorContainerId: [{ SlotIndex: 0, ItemId: 'clotharmor', StackCount: 1 }],
+        FoodEquipContainerId: [{ SlotIndex: 0, ItemId: 'baked_berries', StackCount: 10 }],
+        DropSlotContainerId: [],
+      },
+    };
+  });
+  const guild = (name, members, level, bases) => ({
+    name,
+    base_camp_level: level,
+    admin_player_uid: players[members[0]].player_uid,
+    players: members.map((m) => ({ player_uid: players[m].player_uid, nickname: players[m].nickname, last_online: new Date().toISOString() })),
+    base_ids: bases.map((_, i) => `${name}-${i}`),
+    base_camp: bases.map(([x, y], i) => ({ id: `${name.length}${i}${members[0]}`, area: 3500, location_x: x, location_y: y })),
+  });
+  return {
+    players,
+    guilds: [
+      guild('Les Pionniers', [0, 1, 2], 18, [[-250000, 150000], [-180000, 60000]]),
+      guild('Ordre du Phénix', [3, 4, 5], 14, [[-420000, -60000]]),
+      guild('Tanuki Corp', [6, 7], 7, [[-60000, 220000]]),
+    ],
+  };
+}
+
 const [cmd, ...args] = process.argv.slice(2);
 const state = readState();
 
@@ -54,7 +131,9 @@ async function main() {
       break;
     }
     case 'update-palworld':
-      out(" Success! App '2394010' already up to date.");
+      await sleep(1500);
+      state.palworldUpdated = true;
+      out(" Success! App '2394010' fully installed.");
       break;
     case 'write-service': {
       const [port, players] = args;
@@ -167,6 +246,28 @@ async function main() {
       }
       break;
     }
+    case 'savtools-install':
+      await sleep(800);
+      state.savtools = true;
+      out('✔ sav_cli installé (simulation)');
+      break;
+    case 'savtools-status':
+      out(state.savtools ? 'installed v0.12.2' : 'missing');
+      break;
+    case 'world-export': {
+      if (!state.savtools) die('sav_cli absent (lancer savtools-install)');
+      await sleep(1500);
+      process.stdout.write(JSON.stringify(fakeWorld()));
+      break;
+    }
+    case 'check-update':
+      out('installed=20111111');
+      out(`latest=${state.palworldUpdated ? '20111111' : '20222222'}`);
+      break;
+    case 'self-update':
+      if (!/^v\d+\.\d+\.\d+$/.test(args[0] ?? '')) die('version invalide');
+      out(`==> Mise à jour vers ${args[0]} lancée (simulation : rien n'est installé)`);
+      break;
     default:
       die(`commande inconnue : ${cmd ?? '(vide)'}`);
   }

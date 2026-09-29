@@ -22,6 +22,7 @@ class Poller {
   private info: PalInfo | null = null;
   private infoAt = 0;
   private status: ServerStatus | null = null;
+  private metrics: PalMetrics | null = null;
   private online: PalPlayer[] = [];
 
   start(): void {
@@ -47,6 +48,10 @@ class Poller {
 
   getStatus(): ServerStatus {
     return this.status ?? this.offlineStatus();
+  }
+
+  getMetrics(): PalMetrics | null {
+    return this.status?.online ? this.metrics : null;
   }
 
   /** Joueurs connectés, avec leurs données privées (réservé à l'admin). */
@@ -111,6 +116,7 @@ class Poller {
       const wasOnline = this.status?.online ?? null;
       this.recordPlayers(players ?? [], now, Math.round(elapsed));
       this.online = players ?? [];
+      this.metrics = metrics;
 
       if (metrics) {
         const pal = getPalworldConfig();
@@ -135,7 +141,7 @@ class Poller {
             metrics.serverframetime,
             metrics.days ?? null,
           );
-          db.prepare('DELETE FROM metrics WHERE ts < ?').run(now - 7 * 24 * 3600 * 1000);
+          db.prepare('DELETE FROM metrics WHERE ts < ?').run(now - 30 * 24 * 3600 * 1000);
         }
       } else {
         this.status = this.offlineStatus();

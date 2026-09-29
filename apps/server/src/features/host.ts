@@ -6,7 +6,7 @@ import { modules } from '../core/modules';
 import { realtime } from '../core/realtime';
 import { getExternalServer, getServerMode, getSiteSettings, saveSiteSettings } from '../core/site';
 import { readConfigValues, updateConfig } from '../palworld/configService';
-import { palctlRawStream, runPalctl } from '../palworld/palctl';
+import { capturePalctl, palctlRawStream, runPalctl } from '../palworld/palctl';
 import { poller, publicPlayerId } from '../palworld/poller';
 import { palworld } from '../palworld/restClient';
 import { restartServer, serviceState, startServer, stopServer } from '../palworld/service';
@@ -31,9 +31,11 @@ export function createFeatureHost(): FeatureHost {
       ban: (u, m) => palworld.ban(u, m),
       unban: (u) => palworld.unban(u),
       save: () => palworld.save(),
+      shutdown: (waittime, message) => palworld.shutdown(waittime, message),
     },
     palctl: (args, opts) => runPalctl(args, opts),
     palctlStream: (args) => palctlRawStream(args),
+    palctlText: async (args, opts) => (await capturePalctl(args, opts)).toString('utf8'),
     server: {
       mode: getServerMode,
       external: getExternalServer,
@@ -42,6 +44,7 @@ export function createFeatureHost(): FeatureHost {
       stop: () => stopServer(),
       restart: () => restartServer(),
       status: () => poller.getStatus(),
+      metrics: () => poller.getMetrics(),
       onlinePlayers: () => poller.getOnlineRaw(),
       leaderboardRows: () =>
         db

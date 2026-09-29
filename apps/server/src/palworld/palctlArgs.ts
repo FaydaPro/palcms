@@ -28,6 +28,11 @@ const SPEC: Record<string, Check> = {
   'backup-restore': (a) => a.length === 1 && isBackup(a[0]),
   'backup-delete': (a) => a.length === 1 && isBackup(a[0]),
   'backup-download': (a) => a.length === 1 && isBackup(a[0]),
+  'savtools-install': (a) => a.length === 0,
+  'savtools-status': (a) => a.length === 0,
+  'world-export': (a) => a.length === 0,
+  'check-update': (a) => a.length === 0,
+  'self-update': (a) => a.length === 1 && /^v\d{1,3}\.\d{1,3}\.\d{1,3}$/.test(a[0]),
 };
 
 export const PALCTL_COMMANDS = Object.keys(SPEC);

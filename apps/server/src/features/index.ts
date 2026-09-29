@@ -5,6 +5,12 @@ import { createAudit, createTeam } from './team';
 import { createLeaderboard, createMap, createStats } from './players';
 import { createAnnouncements, createBackups, createSchedules } from './operations';
 import { createDiscord, createModeration, createRcon, createThemes } from './community';
+import { createWorld } from './world';
+import { createMonitoring } from './monitoring';
+import { createEvents } from './events';
+import { createAntiCheat, createSanctions } from './sanctions';
+import { createTickets } from './tickets';
+import { createUpdates } from './updates';
 
 export { MIGRATIONS as FEATURE_MIGRATIONS, MODULES as FEATURE_MODULES };
 
@@ -16,7 +22,15 @@ export const createFeatures: CreateFeatures = (host) => {
   const bus = new FeatureBus();
   const team = createTeam(host);
   const backups = createBackups(host, bus);
+  const world = createWorld(host, bus);
   const features: Feature[] = [
+    world,
+    createMonitoring(host, bus),
+    createEvents(host, bus),
+    createSanctions(host),
+    createAntiCheat(host, bus, world),
+    createTickets(host, bus),
+    createUpdates(host, bus, backups),
     team,
     createAudit(host),
     createMap(host),

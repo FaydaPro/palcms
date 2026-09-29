@@ -14,6 +14,16 @@ Si Pocketpair demande le retrait de ce fichier, il suffit de le supprimer. Le CM
 - La conversion des coordonnées vers l'image reprend la convention de calibration de [palworld-live-map](https://github.com/LukeHollandDev/palworld-live-map) (licence MIT, © 2026 Luke Holland).
 - La conversion vers les coordonnées affichées en jeu reprend la formule de [palworld-coord](https://github.com/palworldlol/palworld-coord) (licence MIT).
 
+## Lecture des sauvegardes — `sav_cli`
+
+- Les données du monde (inventaires, Pals, guildes, bases) sont lues avec `sav_cli`, tiré de [palworld-server-tool](https://github.com/zaigie/palworld-server-tool) (licence Apache-2.0). Ses dépendances d'exécution (palsav-flex, palooz) sont sous licence GPL-3.0 ou ultérieure.
+- `sav_cli` **n'est pas inclus** dans PalCMS : il est téléchargé sur le VPS depuis la version officielle `v0.12.2` de palworld-server-tool, et son empreinte SHA-256 est vérifiée avant l'installation (`scripts/palctl`, commande `savtools-install`).
+
+## Noms des Pals, objets et talents — `apps/server/src/gamedata`
+
+- Tables de noms (en anglais) et coordonnées des points de voyage rapide et des tours de boss, extraites de [palworld-server-tool](https://github.com/zaigie/palworld-server-tool) (`web/src/assets`, licence Apache-2.0).
+- Les noms eux-mêmes appartiennent à Pocketpair, Inc.
+
 ## Marques
 
 Palworld est une marque de Pocketpair, Inc. PalCMS est un projet indépendant, sans lien avec Pocketpair : il n'est ni affilié, ni approuvé, ni sponsorisé par cette société.

@@ -12,6 +12,8 @@ export const PERMISSIONS = {
   'server.rcon': 'Console RCON',
   'server.backups': 'Sauvegardes et restauration',
   'server.schedules': 'Redémarrages programmés et mises à jour',
+  'server.world': 'Données du monde (inventaires, Pals, guildes)',
+  'server.events': 'Événements et préréglages',
   'site.pages': 'Pages',
   'site.news': 'Actualités',
   'site.appearance': 'Apparence, menu et thèmes',
@@ -19,8 +21,10 @@ export const PERMISSIONS = {
   'site.members': 'Membres',
   'site.map': 'Carte (image et points d’intérêt)',
   'site.discord': 'Discord',
+  'site.tickets': 'Signalements et suggestions',
   'admin.team': 'Équipe et rôles',
   'admin.audit': 'Journal des actions',
+  'admin.updates': 'Mises à jour de PalCMS',
 } as const;
 
 export type Permission = keyof typeof PERMISSIONS;

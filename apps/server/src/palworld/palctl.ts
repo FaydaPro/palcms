@@ -86,6 +86,44 @@ export function runPalctl(args: string[], opts: RunOptions = {}): Promise<string
   });
 }
 
+/**
+ * Sortie complète d'une commande palctl (ex. export JSON du monde, plusieurs Mo),
+ * sans la limite de runPalctl. Lève PalctlError avec la fin de stderr si la commande échoue.
+ */
+export function capturePalctl(args: string[], opts: { timeoutMs?: number; maxBytes?: number } = {}): Promise<Buffer> {
+  const maxBytes = opts.maxBytes ?? 256 * 1024 * 1024;
+  return new Promise((resolve, reject) => {
+    let child: ChildProcess;
+    try {
+      child = start(args);
+    } catch (e) {
+      return reject(e);
+    }
+    const chunks: Buffer[] = [];
+    let size = 0;
+    let stderr = '';
+    child.stdout?.on('data', (c: Buffer) => {
+      size += c.length;
+      if (size > maxBytes) child.kill('SIGTERM');
+      else chunks.push(c);
+    });
+    child.stderr?.on('data', (c: Buffer) => {
+      stderr = (stderr + c.toString('utf8')).slice(-4000);
+    });
+    const timer = opts.timeoutMs ? setTimeout(() => child.kill('SIGTERM'), opts.timeoutMs) : null;
+    child.on('error', (e) => {
+      if (timer) clearTimeout(timer);
+      reject(new PalctlError(`Impossible de lancer palctl : ${e.message}`, -1, stderr));
+    });
+    child.on('close', (code) => {
+      if (timer) clearTimeout(timer);
+      if (code === 0) resolve(Buffer.concat(chunks));
+      else reject(new PalctlError(stderr.trim().split('\n').pop() || `palctl ${args[0]} a échoué (code ${code})`, code ?? -1, stderr));
+    });
+    child.stdin?.end();
+  });
+}
+
 /** Sortie binaire brute d'une commande palctl (ex. téléchargement d'une sauvegarde). */
 export function palctlRawStream(args: string[]): NodeJS.ReadableStream {
   const child = start(args);

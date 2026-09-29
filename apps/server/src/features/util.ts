@@ -31,6 +31,15 @@ type ProEvents = {
   'update:done': Record<string, never>;
   /** Arrêt voulu (redémarrage programmé, restauration…) : ce n'est pas un crash. */
   intentional: Record<string, never>;
+  'world:synced': { players: number; guilds: number };
+  'world:failed': { error: string };
+  /** Alerte de surveillance (FPS bas, mémoire, disque, API injoignable, crash…). */
+  alert: { level: 'info' | 'warning' | 'critical'; kind: string; message: string };
+  'event:started': { name: string };
+  'event:ended': { name: string };
+  'update:available': { current: string; latest: string };
+  'flag:new': { name: string; kind: string; details: string };
+  'ticket:new': { kind: string; subject: string; username: string };
 };
 
 /** Petit bus interne aux fonctionnalités (ex. sauvegardes → Discord). */
@@ -65,6 +74,24 @@ export function every(ms: number, fn: () => unknown): () => void {
 }
 
 export const errorText = (e: unknown) => (e instanceof Error ? e.message : String(e));
+
+/**
+ * Ajoute des liens au menu du site une seule fois (première version qui les propose),
+ * juste après "after". Ensuite l'admin reste libre de les déplacer ou de les retirer.
+ */
+export function addMenuOnce(host: FeatureHost, key: string, items: { label: string; url: string }[], after: string) {
+  if (host.settings.get(key, false)) return;
+  const site = host.site.get();
+  const menu = [...site.menu];
+  let at = menu.findIndex((m) => m.url === after);
+  at = at >= 0 ? at + 1 : menu.length;
+  for (const item of items) {
+    if (menu.some((m) => m.url === item.url)) continue;
+    menu.splice(at++, 0, item);
+  }
+  host.site.save({ ...site, menu: menu.slice(0, 20) });
+  host.settings.set(key, true);
+}
 
 /** Date locale du VPS au format AAAA-MM-JJ. */
 export function localDay(d = new Date()): string {

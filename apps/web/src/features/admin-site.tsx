@@ -329,7 +329,7 @@ export function ThemesPage() {
 interface DiscordData {
   webhookUrl: string;
   configured: boolean;
-  events: { server: boolean; schedule: boolean; content: boolean };
+  events: { server: boolean; schedule: boolean; content: boolean; alerts?: boolean };
 }
 
 export function DiscordPage() {
@@ -389,8 +389,14 @@ export function DiscordPage() {
             <Toggle
               checked={form.events.content}
               onChange={(v) => setForm({ ...form, events: { ...form.events, content: v } })}
-              label="Actualités et membres"
-              description="Nouvel article publié, nouvelle inscription à valider."
+              label="Actualités, membres et signalements"
+              description="Nouvel article publié, nouvelle inscription à valider, nouveau signalement ou suggestion."
+            />
+            <Toggle
+              checked={form.events.alerts ?? true}
+              onChange={(v) => setForm({ ...form, events: { ...form.events, alerts: v } })}
+              label="Alertes"
+              description="FPS bas, mémoire ou disque presque pleins, API injoignable, soupçon de triche, nouvelle version de PalCMS."
             />
           </div>
           <div className="flex flex-wrap gap-2">

@@ -1,4 +1,4 @@
-import { useEffect, useState, type FormEvent } from 'react';
+import { Suspense, lazy, useEffect, useState, type FormEvent } from 'react';
 import { Link, Navigate, useNavigate, useSearchParams } from 'react-router-dom';
 import { Clock, Gamepad2, Mail, ShieldCheck } from 'lucide-react';
 import type { PlayerProfile, PublicUser } from '@palcms/shared';
@@ -7,6 +7,8 @@ import { useApp } from '../lib/app';
 import { formatDuration } from '../lib/format';
 import { Alert, Badge, Button, Card, Field, Input } from '../components/ui';
 import { Container, NotFound } from './pages';
+
+const CharacterSection = lazy(() => import('../features/world-public').then((m) => ({ default: m.CharacterSection })));
 
 function SteamButton({ label }: { label: string }) {
   return (
@@ -306,6 +308,16 @@ export function ProfilePage() {
             </p>
           )}
         </Card>
+
+        <Suspense fallback={null}>
+          <CharacterSection />
+        </Suspense>
+
+        {boot.modules.tickets && (
+          <Link to="/signaler" className="text-sm font-medium text-accent">
+            Signaler un problème ou proposer une idée à l’équipe →
+          </Link>
+        )}
 
         <Card title="Mon compte">
           {msg && <Alert kind={msg.kind} className="mb-4">{msg.text}</Alert>}

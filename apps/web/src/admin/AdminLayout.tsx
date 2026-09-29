@@ -1,10 +1,18 @@
 import { useEffect, useState, type ReactNode } from 'react';
 import { Link, Navigate, NavLink, Outlet, useLocation } from 'react-router-dom';
 import {
+  Activity,
   Archive,
+  BarChart3,
   Blocks,
   CalendarClock,
+  Download,
   ExternalLink,
+  Flag,
+  Gavel,
+  Globe,
+  PartyPopper,
+  Radar,
   FileText,
   Gauge,
   LayoutList,
@@ -77,6 +85,7 @@ export function AdminLayout() {
   const { boot, isAdmin } = useApp();
   const [open, setOpen] = useState(false);
   const [pending, setPending] = useState(0);
+  const [openTickets, setOpenTickets] = useState(0);
   const location = useLocation();
 
   useEffect(() => setOpen(false), [location.pathname]);
@@ -90,6 +99,13 @@ export function AdminLayout() {
     api
       .get<unknown[]>('admin/members?status=pending')
       .then((r) => setPending(r.length))
+      .catch(() => {});
+  }, [isAdmin, boot.user, location.pathname]);
+  useEffect(() => {
+    if (!isAdmin || !boot.user?.permissions.includes('site.tickets')) return;
+    api
+      .get<{ open: number }>('features/tickets?status=open')
+      .then((r) => setOpenTickets(r.open))
       .catch(() => {});
   }, [isAdmin, boot.user, location.pathname]);
 
@@ -117,14 +133,20 @@ export function AdminLayout() {
 
   const server = visible([
     { to: '/admin/serveur', label: 'Tableau de bord', icon: Gauge },
+    { to: '/admin/serveur/surveillance', label: 'Surveillance', icon: Activity, permission: 'server.players' },
+    { to: '/admin/serveur/statistiques', label: 'Statistiques', icon: BarChart3, permission: 'server.players' },
     { to: '/admin/serveur/connexion', label: 'Connexion au serveur', icon: PlugZap, permission: 'server.config' },
     { to: '/admin/serveur/configuration', label: 'Configuration', icon: Settings2, permission: 'server.config', managedOnly: true },
+    { to: '/admin/serveur/evenements', label: 'Événements', icon: PartyPopper, permission: 'server.events', managedOnly: true },
     { to: '/admin/serveur/joueurs', label: 'Joueurs', icon: Users, permission: 'server.players' },
+    { to: '/admin/serveur/monde', label: 'Données du monde', icon: Globe, permission: 'server.world', managedOnly: true },
     { to: '/admin/serveur/logs', label: 'Logs', icon: ScrollText, permission: 'server.logs', managedOnly: true },
     { to: '/admin/serveur/sauvegardes', label: 'Sauvegardes', icon: Archive, permission: 'server.backups', managedOnly: true },
     { to: '/admin/serveur/programmation', label: 'Programmation', icon: CalendarClock, permission: 'server.schedules', managedOnly: true },
     { to: '/admin/serveur/annonces', label: 'Annonces en jeu', icon: Megaphone, permission: 'server.announce' },
     { to: '/admin/serveur/moderation', label: 'Modération', icon: ShieldAlert, permission: 'server.moderation' },
+    { to: '/admin/serveur/sanctions', label: 'Sanctions', icon: Gavel, permission: 'server.moderation' },
+    { to: '/admin/serveur/anti-triche', label: 'Anti-triche', icon: Radar, permission: 'server.moderation' },
     { to: '/admin/serveur/rcon', label: 'Console RCON', icon: Terminal, permission: 'server.rcon' },
   ]);
   const site = visible([
@@ -143,10 +165,18 @@ export function AdminLayout() {
       permission: 'site.members',
       badge: pending > 0 ? <Badge tone="amber">{pending}</Badge> : undefined,
     },
+    {
+      to: '/admin/site/signalements',
+      label: 'Signalements',
+      icon: Flag,
+      permission: 'site.tickets',
+      badge: openTickets > 0 ? <Badge tone="amber">{openTickets}</Badge> : undefined,
+    },
   ]);
   const admin = visible([
     { to: '/admin/equipe', label: 'Équipe et rôles', icon: Shield, permission: 'admin.team' },
     { to: '/admin/journal', label: 'Journal des actions', icon: ScrollText, permission: 'admin.audit' },
+    { to: '/admin/mises-a-jour', label: 'Mises à jour', icon: Download, permission: 'admin.updates' },
   ]);
 
   const nav = (

@@ -4,6 +4,7 @@
 import type { WsServerMessage } from '@palcms/shared';
 import seed from './data.json';
 import { version } from '../../package.json';
+import { createV11 } from './v11';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type Any = any;
@@ -344,6 +345,20 @@ function record(action: string, target: string | null = null) {
   state.audit.unshift(audit(action, target));
 }
 
+const v11 = createV11({
+  players,
+  state: () => state,
+  start: START,
+  online: serverOnline,
+  status,
+  metrics: () => metrics,
+  log,
+  record,
+  fail: (code, message) => {
+    throw new DemoError(code, message);
+  },
+});
+
 function handle(method: string, fullPath: string, body: Any): Any {
   const [path, qs] = fullPath.split('?');
   const q = new URLSearchParams(qs ?? '');
@@ -403,6 +418,9 @@ function handle(method: string, fullPath: string, body: Any): Any {
   }
   if (route === 'GET features/theme') return state.theme;
 
+  const fromV11 = v11.publicRoute(method, path, seg, q, body);
+  if (fromV11 !== undefined) return fromV11;
+
   if (seg[0] === 'setup') notInDemo();
 
   // Tout le reste est réservé à l'équipe
@@ -413,6 +431,8 @@ function handle(method: string, fullPath: string, body: Any): Any {
 function handleAdmin(method: string, path: string, seg: string[], q: URLSearchParams, body: Any): Any {
   const route = `${method} ${path}`;
   const id = Number(seg[3]);
+  const fromV11 = v11.adminRoute(method, path, seg, q, body);
+  if (fromV11 !== undefined) return fromV11;
 
   // Serveur
   if (route === 'GET admin/server/overview') {

@@ -24,6 +24,16 @@ export interface HostPlayer {
   building_count: number;
 }
 
+export interface HostMetrics {
+  serverfps: number;
+  currentplayernum: number;
+  serverframetime: number;
+  maxplayernum: number;
+  uptime: number;
+  days?: number;
+  basecampnum?: number;
+}
+
 export interface HostUser {
   id: number;
   username: string;
@@ -98,10 +108,14 @@ export interface FeatureHost {
     ban(userid: string, message: string): Promise<void>;
     unban(userid: string): Promise<void>;
     save(): Promise<void>;
+    /** Arrêt propre : le serveur prévient les joueurs, attend "waittime" secondes puis sauvegarde et s'arrête. */
+    shutdown(waittime: number, message: string): Promise<void>;
   };
   palctl(args: string[], opts?: { onLine?: (l: string) => void; timeoutMs?: number }): Promise<string>;
   /** Commande palctl dont la sortie est binaire (ex. téléchargement d'une sauvegarde). */
   palctlStream(args: string[]): ByteStream;
+  /** Sortie texte complète d'une commande palctl, sans limite de taille (ex. export JSON du monde). */
+  palctlText(args: string[], opts?: { timeoutMs?: number }): Promise<string>;
   server: {
     /** managed : géré par PalCMS (palctl disponible) ; external : serveur existant ; none : aucun serveur. */
     mode(): import('./schemas').ServerMode;
@@ -112,6 +126,8 @@ export interface FeatureHost {
     stop(): Promise<void>;
     restart(): Promise<void>;
     status(): ServerStatus;
+    /** Dernières métriques brutes de l'API REST (null si le serveur ne répond pas). */
+    metrics(): HostMetrics | null;
     onlinePlayers(): HostPlayer[];
     leaderboardRows(): { public_id: string; name: string; level: number; online: number; playtime_seconds: number }[];
     publicPlayerId(uid: string): string;
