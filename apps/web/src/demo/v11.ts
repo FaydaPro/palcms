@@ -1,5 +1,7 @@
 // Démo : données du monde, surveillance, événements, sanctions, signalements et mises à jour (PalCMS 1.1).
 
+import { PALDEX, paldexId } from '@palcms/shared';
+
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type Any = any;
 
@@ -191,24 +193,52 @@ export function createV11(ctx: DemoContext) {
       return guildDetail(g!);
     }
     if (route === 'GET features/paldex') {
-      const map = new Map<string, Any>();
-      world.forEach((w, i) =>
-        w.pals.forEach((p) => {
-          const key = p.type.replace(/^BOSS_/, '');
-          const cur = map.get(key) ?? { type: key, name: p.name, count: 0, owners: new Set(), lucky: 0, alpha: 0, maxLevel: 0 };
-          cur.count++;
-          cur.owners.add(i);
-          cur.lucky += p.lucky ? 1 : 0;
-          cur.alpha += p.boss ? 1 : 0;
-          cur.maxLevel = Math.max(cur.maxLevel, p.level);
-          map.set(key, cur);
-        }),
+      const joueur = q.get('joueur');
+      const guilde = q.get('guilde');
+      let owners: number[] = ctx.players.map((_, i) => i);
+      let scope: Any = { type: 'server', id: null, name: 'Serveur', guild: null };
+      if (joueur) {
+        const i = ctx.players.findIndex((p) => p.publicId === joueur);
+        if (i < 0) ctx.fail(404, 'Joueur introuvable dans la sauvegarde');
+        const g = guildOf(i);
+        scope = { type: 'player', id: joueur, name: ctx.players[i].name, guild: g ? { id: g.id, name: g.name } : null };
+        owners = [i];
+      } else if (guilde) {
+        const g = GUILDS.find((x) => x.id === guilde);
+        if (!g) ctx.fail(404, 'Guilde introuvable');
+        scope = { type: 'guild', id: guilde, name: g!.name, guild: null };
+        owners = g!.members;
+      }
+      const pals = owners.flatMap((i) => world[i].pals.map((p) => ({ ...p, owner: i })));
+      const entries = PALDEX.map((s) => {
+        const mine = pals.filter((p) => paldexId(p.type) === s.id);
+        return {
+          ...s,
+          count: mine.length,
+          owners: new Set(mine.map((p) => p.owner)).size,
+          lucky: mine.filter((p) => p.lucky).length,
+          alpha: mine.filter((p) => p.boss).length,
+          maxLevel: Math.max(0, ...mine.map((p) => p.level)),
+        };
+      });
+      const species = (idx: number[]) => new Set(idx.flatMap((i) => world[i].pals.map((p) => paldexId(p.type)))).size;
+      const collectors = ctx.players
+        .map((p, i) => ({ id: p.publicId, name: p.name, species: species([i]), pals: world[i].pals.length }))
+        .sort((a, b) => b.species - a.species || b.pals - a.pals);
+      const guilds = GUILDS.map((g) => ({ id: g.id, name: g.name, species: species(g.members), pals: g.members.reduce((n, i) => n + world[i].pals.length, 0) })).sort(
+        (a, b) => b.species - a.species,
       );
-      const species = [...map.values()].map((x) => ({ ...x, owners: x.owners.size })).sort((a, b) => b.count - a.count);
-      const collectors = world
-        .map((w, i) => ({ name: ctx.players[i].name, publicId: ctx.players[i].publicId, pals: w.pals.length }))
-        .sort((a, b) => b.pals - a.pals);
-      return { syncedAt: syncedAt(), total: species.reduce((n, x) => n + x.count, 0), species, collectors };
+      return {
+        syncedAt: syncedAt(),
+        scope,
+        total: PALDEX.length,
+        caught: entries.filter((e) => e.count > 0).length,
+        pals: pals.length,
+        lucky: pals.filter((p) => p.lucky).length,
+        entries,
+        collectors,
+        guilds,
+      };
     }
     if (route === 'GET features/world/map') {
       return {

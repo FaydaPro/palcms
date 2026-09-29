@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { itemName, palName, passiveName } from '../src/gamedata';
-import { parseWorld, worldUidFromPlayerId } from '../src/features/world';
+import { buildPaldex, parseWorld, worldUidFromPlayerId } from '../src/features/world';
 import { itemAnomalies, levelAnomalies } from '../src/features/sanctions';
 import { attendanceHeatmap } from '../src/features/monitoring';
 import { compareVersions, parseBuildIds } from '../src/features/updates';
@@ -26,6 +26,17 @@ describe('données du monde', () => {
     expect(w.players[0].pals).toHaveLength(1);
     expect(w.guilds[0].base_camp).toHaveLength(1);
     expect(() => parseWorld('{"players": 1}')).toThrow();
+  });
+
+  it('construit le Paldex complet par numéro, alphas comptés avec leur espèce', () => {
+    const dex = buildPaldex([
+      { type: 'SheepBall', owner: '1', lucky: 0, alpha: 0, level: 5 },
+      { type: 'BOSS_SheepBall', owner: '2', lucky: 1, alpha: 1, level: 12 },
+      { type: 'Inconnu', owner: '1', lucky: 0, alpha: 0, level: 1 },
+    ]);
+    expect(dex).toHaveLength(288);
+    expect(dex[0]).toMatchObject({ no: '001', name: 'Lamball', count: 2, owners: 2, lucky: 1, alpha: 1, maxLevel: 12 });
+    expect(dex.filter((e) => e.count > 0)).toHaveLength(1);
   });
 
   it('traduit les identifiants du jeu en noms', () => {

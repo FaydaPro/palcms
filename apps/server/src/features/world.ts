@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import type { FeatureContext, FeatureHost } from '@palcms/shared';
+import { PALDEX, paldexId, type FeatureContext, type FeatureHost } from '@palcms/shared';
 import { MAP_POINTS, itemName, palName, passiveName } from '../gamedata';
 import { addMenuOnce, errorText, every, httpError, parseBody, type Feature, type FeatureBus } from './util';
 
@@ -94,6 +94,25 @@ export function parseWorld(json: string): SavWorld {
       base_camp: Array.isArray(g.base_camp) ? g.base_camp.filter((b) => b && str(b.id)) : [],
     }));
   return { players, guilds };
+}
+
+/** Les 288 entrées du Paldex, avec ce qui a été capturé (pur, testé). */
+export function buildPaldex(rows: { type: string; owner: string; lucky: number; alpha: number; level: number }[]) {
+  const by = new Map<string, { count: number; owners: Set<string>; lucky: number; alpha: number; maxLevel: number }>();
+  for (const r of rows) {
+    const id = paldexId(r.type);
+    const cur = by.get(id) ?? { count: 0, owners: new Set<string>(), lucky: 0, alpha: 0, maxLevel: 0 };
+    cur.count++;
+    cur.owners.add(r.owner);
+    cur.lucky += r.lucky ? 1 : 0;
+    cur.alpha += r.alpha ? 1 : 0;
+    cur.maxLevel = Math.max(cur.maxLevel, r.level);
+    by.set(id, cur);
+  }
+  return PALDEX.map((s) => {
+    const c = by.get(s.id);
+    return { ...s, count: c?.count ?? 0, owners: c?.owners.size ?? 0, lucky: c?.lucky ?? 0, alpha: c?.alpha ?? 0, maxLevel: c?.maxLevel ?? 0 };
+  });
 }
 
 interface WorldSettings {
@@ -469,33 +488,75 @@ export function createWorld(host: FeatureHost, bus: FeatureBus): Feature & World
         access: 'public',
         handler: (ctx) => {
           if (!host.modules.isEnabled('paldex') && !canWorld(ctx)) throw httpError(404, 'Page désactivée');
-          if (!state.lastAt) return { syncedAt: null, total: 0, species: [], collectors: [] };
+          const players = db.prepare('SELECT player_uid, nickname FROM world_players').all() as { player_uid: string; nickname: string }[];
+          // Identifiant public d'un personnage : celui de son profil s'il existe, sinon dérivé de la sauvegarde.
+          const idOf = (wuid: string) => publicIdOfWorldUid(wuid) ?? host.server.publicPlayerId(`world:${wuid}`);
+
+          // Portée : tout le serveur, un joueur ou une guilde
+          let scope: { type: 'server' | 'player' | 'guild'; id: string | null; name: string; guild: { id: string; name: string } | null } = {
+            type: 'server',
+            id: null,
+            name: 'Serveur',
+            guild: null,
+          };
+          let owners: string[] | null = null;
+          if (ctx.query.joueur) {
+            const p = players.find((x) => idOf(x.player_uid) === ctx.query.joueur);
+            if (!p) throw httpError(404, 'Joueur introuvable dans la sauvegarde');
+            const g = guildOf(p.player_uid);
+            scope = { type: 'player', id: ctx.query.joueur, name: p.nickname, guild: g ? { id: guildPublicId(g.id), name: g.name } : null };
+            owners = [p.player_uid];
+          } else if (ctx.query.guilde) {
+            const gid = findGuild(ctx.query.guilde);
+            if (!gid) throw httpError(404, 'Guilde introuvable');
+            const g = db.prepare('SELECT name FROM world_guilds WHERE id = ?').get(gid) as { name: string };
+            scope = { type: 'guild', id: ctx.query.guilde, name: g.name, guild: null };
+            owners = (db.prepare('SELECT player_uid FROM world_guild_members WHERE guild_id = ?').all(gid) as { player_uid: string }[]).map((m) => m.player_uid);
+          }
+
+          const where = owners ? `WHERE owner_uid IN (${owners.map(() => '?').join(',') || "''"})` : '';
           const rows = db
             .prepare(
-              `SELECT type, COUNT(*) AS count, COUNT(DISTINCT owner_uid) AS owners, SUM(is_lucky) AS lucky, SUM(is_boss) AS alpha, MAX(level) AS maxLevel
-               FROM world_pals GROUP BY type`,
+              `SELECT type, owner_uid AS owner, is_lucky AS lucky, is_boss AS alpha, level FROM world_pals ${where}`,
             )
-            .all() as { type: string; count: number; owners: number; lucky: number; alpha: number; maxLevel: number }[];
-          // Les variantes alpha (BOSS_x) sont regroupées avec l'espèce normale.
-          const bySpecies = new Map<string, { type: string; name: string; count: number; owners: number; lucky: number; alpha: number; maxLevel: number }>();
-          for (const r of rows) {
-            const base = r.type.replace(/^boss_/i, '');
-            const cur = bySpecies.get(base.toLowerCase());
-            if (cur) {
-              cur.count += r.count;
-              cur.owners = Math.max(cur.owners, r.owners);
-              cur.lucky += r.lucky;
-              cur.alpha += r.alpha;
-              cur.maxLevel = Math.max(cur.maxLevel, r.maxLevel);
-            } else bySpecies.set(base.toLowerCase(), { ...r, type: base, name: palName(base) });
+            .all(...(owners ?? [])) as { type: string; owner: string; lucky: number; alpha: number; level: number }[];
+          const entries = buildPaldex(rows);
+
+          // Classements : joueurs et guildes par nombre d'espèces capturées
+          const all = db.prepare('SELECT type, owner_uid AS owner FROM world_pals').all() as { type: string; owner: string }[];
+          const speciesBy = new Map<string, Set<string>>();
+          const palsBy = new Map<string, number>();
+          for (const r of all) {
+            if (!speciesBy.has(r.owner)) speciesBy.set(r.owner, new Set());
+            speciesBy.get(r.owner)!.add(paldexId(r.type));
+            palsBy.set(r.owner, (palsBy.get(r.owner) ?? 0) + 1);
           }
-          const collectors = (db.prepare('SELECT player_uid, nickname, pal_count FROM world_players ORDER BY pal_count DESC LIMIT 10').all() as {
-            player_uid: string;
-            nickname: string;
-            pal_count: number;
-          }[]).map((c) => ({ name: c.nickname, publicId: publicIdOfWorldUid(c.player_uid), pals: c.pal_count }));
-          const species = [...bySpecies.values()].sort((a, b) => b.count - a.count);
-          return { syncedAt: state.lastAt, total: species.reduce((n, s) => n + s.count, 0), species, collectors };
+          const collectors = players
+            .map((p) => ({ id: idOf(p.player_uid), name: p.nickname, species: speciesBy.get(p.player_uid)?.size ?? 0, pals: palsBy.get(p.player_uid) ?? 0 }))
+            .filter((c) => c.pals > 0)
+            .sort((a, b) => b.species - a.species || b.pals - a.pals)
+            .slice(0, 20);
+          const guilds = (db.prepare('SELECT id, name FROM world_guilds').all() as { id: string; name: string }[])
+            .map((g) => {
+              const members = (db.prepare('SELECT player_uid FROM world_guild_members WHERE guild_id = ?').all(g.id) as { player_uid: string }[]).map((m) => m.player_uid);
+              const species = new Set(members.flatMap((m) => [...(speciesBy.get(m) ?? [])]));
+              return { id: guildPublicId(g.id), name: g.name, species: species.size, pals: members.reduce((n, m) => n + (palsBy.get(m) ?? 0), 0) };
+            })
+            .filter((g) => g.pals > 0)
+            .sort((a, b) => b.species - a.species || b.pals - a.pals)
+            .slice(0, 10);
+
+          return {
+            syncedAt: state.lastAt || null,
+            scope,
+            total: PALDEX.length,
+            caught: entries.filter((e) => e.count > 0).length,
+            pals: rows.length,
+            lucky: rows.filter((r) => r.lucky).length,
+            entries,
+            collectors,
+            guilds,
+          };
         },
       },
       {

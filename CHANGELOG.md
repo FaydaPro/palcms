@@ -5,7 +5,8 @@
 **Données du monde** (lecture des sauvegardes avec `sav_cli`, serveur installé par PalCMS)
 - Inventaire, Pals (talents, passifs, chanceux, alpha) et guilde de chaque joueur dans le panel
 - Recherche d'un objet chez tous les joueurs
-- Pages publiques Guildes (membres, niveau, bases) et Paldex du serveur (espèces, raretés, meilleurs collectionneurs)
+- Pages publiques Guildes (membres, niveau, bases)
+- Paldex façon boîte à Pals : les 288 Pals par numéro avec leur image, silhouettes pour ceux pas encore capturés, Paldex du serveur, de chaque joueur et de chaque guilde, classements des collectionneurs
 - « Mon personnage » dans le profil des joueurs inscrits
 - Carte : calques des bases de guildes, points de voyage rapide et tours de boss
 

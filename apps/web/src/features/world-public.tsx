@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState, type ReactNode } from 'react';
-import { Link, useParams } from 'react-router-dom';
+import { Link, useParams, useSearchParams } from 'react-router-dom';
 import { Activity, BookOpen, CalendarDays, Castle, Clock, Crown, Flag, Lightbulb, PartyPopper, Search, Sparkles, Star, Users } from 'lucide-react';
 import { api, errorText, url } from '../lib/api';
 import { useApp } from '../lib/app';
@@ -182,9 +182,11 @@ export function PalIcon({ type, size = 48 }: { type: string; size?: number }) {
   );
 }
 
-interface Species {
-  type: string;
+interface DexEntry {
+  id: string;
+  no: string;
   name: string;
+  elements: string[];
   count: number;
   owners: number;
   lucky: number;
@@ -192,98 +194,278 @@ interface Species {
   maxLevel: number;
 }
 
-export function PaldexPage() {
-  const { data, error } = useGet<{ syncedAt: number | null; total: number; species: Species[]; collectors: { name: string; publicId: string | null; pals: number }[] }>(
-    'features/paldex',
+interface DexData {
+  syncedAt: number | null;
+  scope: { type: 'server' | 'player' | 'guild'; id: string | null; name: string; guild: { id: string; name: string } | null };
+  total: number;
+  caught: number;
+  pals: number;
+  lucky: number;
+  entries: DexEntry[];
+  collectors: { id: string; name: string; species: number; pals: number }[];
+  guilds: { id: string; name: string; species: number; pals: number }[];
+}
+
+const ELEMENTS: Record<string, { label: string; color: string }> = {
+  neutral: { label: 'Neutre', color: '#a8a29e' },
+  grass: { label: 'Plante', color: '#22c55e' },
+  water: { label: 'Eau', color: '#3b82f6' },
+  fire: { label: 'Feu', color: '#ef4444' },
+  electric: { label: 'Électrique', color: '#eab308' },
+  dark: { label: 'Ténèbres', color: '#7c3aed' },
+  ground: { label: 'Terre', color: '#a16207' },
+  ice: { label: 'Glace', color: '#38bdf8' },
+  dragon: { label: 'Dragon', color: '#c026d3' },
+};
+
+const PER_PAGE = 30;
+
+function ElementBadge({ element }: { element: string }) {
+  const e = ELEMENTS[element] ?? { label: element, color: '#64748b' };
+  return (
+    <span className="rounded-full px-2 py-0.5 text-[11px] font-semibold text-white" style={{ background: e.color }}>
+      {e.label}
+    </span>
   );
+}
+
+/** Case de la grille, façon boîte à Pals : silhouette tant que le Pal n'a pas été capturé. */
+function DexCell({ e, selected, onClick }: { e: DexEntry; selected: boolean; onClick: () => void }) {
+  const caught = e.count > 0;
+  const [missing, setMissing] = useState(false);
+  return (
+    <button
+      onClick={onClick}
+      title={caught ? `${e.name} · ×${e.count}` : `n° ${e.no} · pas encore capturé`}
+      className={cx(
+        'group relative flex aspect-square flex-col items-center justify-center rounded-xl p-1 ring-1 transition',
+        caught ? 'bg-slate-50 ring-slate-200 hover:ring-accent dark:bg-slate-800/70 dark:ring-slate-700' : 'bg-slate-100/60 ring-slate-200/60 dark:bg-slate-900 dark:ring-slate-800',
+        selected && 'ring-2 ring-accent',
+      )}
+    >
+      <span className="absolute top-1 left-1.5 text-[10px] font-bold text-slate-400 tabular-nums">{e.no}</span>
+      {e.lucky > 0 && <span className="absolute top-0.5 right-1 text-xs">✨</span>}
+      {missing ? (
+        <span className="text-2xl opacity-30">🐾</span>
+      ) : (
+        <img
+          src={url(`pals/${e.id}.png`)}
+          alt=""
+          loading="lazy"
+          onError={() => setMissing(true)}
+          className={cx('h-3/5 w-3/5 object-contain transition group-hover:scale-110', !caught && 'opacity-25 brightness-0 dark:invert')}
+        />
+      )}
+      <span className={cx('mt-0.5 w-full truncate text-center text-[10px] leading-tight font-medium', !caught && 'text-slate-400')}>{caught ? e.name : '???'}</span>
+      {caught && <span className="absolute right-1 bottom-1 rounded bg-accent px-1 text-[10px] font-bold text-accent-fg tabular-nums">{e.count}</span>}
+    </button>
+  );
+}
+
+export function PaldexPage() {
+  const [params, setParams] = useSearchParams();
+  const joueur = params.get('joueur');
+  const guilde = params.get('guilde');
+  const query = joueur ? `?joueur=${encodeURIComponent(joueur)}` : guilde ? `?guilde=${encodeURIComponent(guilde)}` : '';
+  const { data, error } = useGet<DexData>(`features/paldex${query}`);
   const [q, setQ] = useState('');
-  const [sort, setSort] = useState<'count' | 'rare' | 'name'>('count');
+  const [onlyCaught, setOnlyCaught] = useState(false);
+  const [selected, setSelected] = useState<string | null>(null);
+  const page = Math.max(1, Number(params.get('page')) || 1);
+
   const list = useMemo(() => {
     if (!data) return [];
-    const l = data.species.filter((s) => s.name.toLowerCase().includes(q.toLowerCase()));
-    if (sort === 'rare') return [...l].sort((a, b) => a.count - b.count);
-    if (sort === 'name') return [...l].sort((a, b) => a.name.localeCompare(b.name));
-    return l;
-  }, [data, q, sort]);
+    const term = q.trim().toLowerCase();
+    return data.entries.filter((e) => (!onlyCaught || e.count > 0) && (!term || e.name.toLowerCase().includes(term) || e.no.toLowerCase().includes(term)));
+  }, [data, q, onlyCaught]);
+  const pages = Math.max(1, Math.ceil(list.length / PER_PAGE));
+  const current = Math.min(page, pages);
+  const shown = list.slice((current - 1) * PER_PAGE, current * PER_PAGE);
+  const detail = data?.entries.find((e) => e.id === selected) ?? null;
+
+  const go = (next: Record<string, string | null>) => {
+    const p = new URLSearchParams();
+    const merged = { joueur, guilde, page: null as string | null, ...next };
+    for (const [k, v] of Object.entries(merged)) if (v) p.set(k, v);
+    setParams(p);
+    setSelected(null);
+  };
+
+  const title = !data || data.scope.type === 'server' ? 'Paldex du serveur' : data.scope.type === 'player' ? `Paldex de ${data.scope.name}` : `Paldex de la guilde ${data.scope.name}`;
 
   return (
-    <Page icon={<BookOpen className="h-8 w-8 text-accent" />} title="Paldex du serveur" subtitle={data ? synced(data.syncedAt) : undefined}>
+    <Page icon={<BookOpen className="h-8 w-8 text-accent" />} title={title} subtitle={data ? synced(data.syncedAt) : undefined}>
       {error ? (
         <Alert kind="info">{error}</Alert>
       ) : !data ? (
         <Spinner />
       ) : (
-        <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_300px]">
+        <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_280px]">
           <div>
+            {data.scope.type !== 'server' && (
+              <div className="mb-4 flex flex-wrap gap-2">
+                <Button variant="secondary" onClick={() => go({ joueur: null, guilde: null })}>
+                  ← Paldex du serveur
+                </Button>
+                {data.scope.guild && (
+                  <Button variant="secondary" onClick={() => go({ joueur: null, guilde: data.scope.guild!.id })}>
+                    <Castle className="h-4 w-4" /> Paldex de sa guilde ({data.scope.guild.name})
+                  </Button>
+                )}
+                {data.scope.type === 'player' && data.scope.id && (
+                  <Link to={`/joueurs/${data.scope.id}`}>
+                    <Button variant="ghost">Profil du joueur</Button>
+                  </Link>
+                )}
+              </div>
+            )}
             <div className="mb-4 grid grid-cols-3 gap-3">
-              <Stat label="Pals capturés" value={data.total} />
-              <Stat label="Espèces" value={data.species.length} />
-              <Stat label="Chanceux ✨" value={data.species.reduce((n, s) => n + s.lucky, 0)} />
+              <div className="rounded-lg bg-slate-50 p-2 dark:bg-slate-800/60">
+                <p className="text-[11px] text-slate-500">Espèces capturées</p>
+                <p className="text-lg font-bold">
+                  {data.caught} <span className="text-sm font-medium text-slate-500">/ {data.total}</span>
+                </p>
+                <div className="mt-1 h-1.5 overflow-hidden rounded-full bg-slate-200 dark:bg-slate-700">
+                  <div className="h-full rounded-full bg-accent" style={{ width: `${(data.caught / data.total) * 100}%` }} />
+                </div>
+              </div>
+              <Stat label="Pals capturés" value={data.pals} />
+              <Stat label="Chanceux ✨" value={data.lucky} />
             </div>
-            <div className="mb-3 flex flex-wrap gap-2">
+            <div className="mb-3 flex flex-wrap items-center gap-3">
               <div className="relative min-w-48 flex-1">
                 <Search className="absolute top-2.5 left-3 h-4 w-4 text-slate-400" />
-                <Input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Chercher un Pal…" className="pl-9" />
+                <Input
+                  value={q}
+                  onChange={(e) => {
+                    setQ(e.target.value);
+                    go({ page: null });
+                  }}
+                  placeholder="Nom ou numéro…"
+                  className="pl-9"
+                />
               </div>
-              <Select value={sort} onChange={(e) => setSort(e.target.value as typeof sort)} className="w-auto">
-                <option value="count">Les plus capturés</option>
-                <option value="rare">Les plus rares</option>
-                <option value="name">Ordre alphabétique</option>
-              </Select>
+              <label className="flex cursor-pointer items-center gap-2 text-sm">
+                <input
+                  type="checkbox"
+                  checked={onlyCaught}
+                  onChange={(e) => {
+                    setOnlyCaught(e.target.checked);
+                    go({ page: null });
+                  }}
+                  className="accent-[var(--accent)]"
+                />
+                Capturés seulement
+              </label>
             </div>
-            {list.length === 0 ? (
-              <Empty>Aucun Pal trouvé.</Empty>
-            ) : (
-              <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
-                {list.map((s) => (
-                  <div key={s.type} className="rounded-xl bg-white p-4 shadow-sm ring-1 ring-slate-200 dark:bg-slate-900 dark:ring-slate-800">
-                    <div className="flex items-start justify-between gap-2">
-                      <div className="flex min-w-0 items-center gap-3">
-                        <PalIcon type={s.type} />
-                        <p className="truncate font-semibold">{s.name}</p>
-                      </div>
-                      <span className="text-lg font-bold text-accent tabular-nums">{s.count}</span>
-                    </div>
-                    <p className="mt-1 text-xs text-slate-500">
-                      {s.owners} dresseur{s.owners > 1 ? 's' : ''} · niv. max {s.maxLevel}
-                    </p>
-                    <div className="mt-2 flex flex-wrap gap-1">
-                      {s.lucky > 0 && <Badge tone="amber">✨ {s.lucky} chanceux</Badge>}
-                      {s.alpha > 0 && <Badge tone="red">{s.alpha} alpha</Badge>}
+
+            <div className="rounded-2xl bg-white p-3 shadow-sm ring-1 ring-slate-200 dark:bg-slate-950 dark:ring-slate-800">
+              {shown.length === 0 ? (
+                <Empty>Aucun Pal.</Empty>
+              ) : (
+                <div className="grid grid-cols-3 gap-2 sm:grid-cols-5 md:grid-cols-6">
+                  {shown.map((e) => (
+                    <DexCell key={e.id} e={e} selected={selected === e.id} onClick={() => setSelected(selected === e.id ? null : e.id)} />
+                  ))}
+                </div>
+              )}
+              <div className="mt-3 flex items-center justify-between gap-2">
+                <Button variant="ghost" disabled={current <= 1} onClick={() => go({ page: String(current - 1) })}>
+                  ‹ Précédente
+                </Button>
+                <div className="flex flex-wrap justify-center gap-1">
+                  {Array.from({ length: pages }, (_, i) => i + 1).map((n) => (
+                    <button
+                      key={n}
+                      onClick={() => go({ page: n === 1 ? null : String(n) })}
+                      className={cx('h-7 min-w-7 rounded-md px-1 text-xs font-semibold tabular-nums', n === current ? 'bg-accent text-accent-fg' : 'text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800')}
+                    >
+                      {n}
+                    </button>
+                  ))}
+                </div>
+                <Button variant="ghost" disabled={current >= pages} onClick={() => go({ page: String(current + 1) })}>
+                  Suivante ›
+                </Button>
+              </div>
+            </div>
+
+            {detail && (
+              <Card className="mt-4">
+                <div className="flex flex-wrap items-center gap-4">
+                  <PalIcon type={detail.id} size={80} />
+                  <div className="min-w-0 flex-1">
+                    <p className="text-xs font-bold text-slate-500">n° {detail.no}</p>
+                    <p className="text-xl font-bold">{detail.count > 0 ? detail.name : '???'}</p>
+                    <div className="mt-1 flex flex-wrap gap-1">
+                      {detail.elements.map((el) => (
+                        <ElementBadge key={el} element={el} />
+                      ))}
                     </div>
                   </div>
-                ))}
-              </div>
+                  {detail.count > 0 ? (
+                    <div className="grid grid-cols-2 gap-2 text-center text-sm sm:grid-cols-4">
+                      <Stat label="Capturés" value={detail.count} />
+                      <Stat label={data.scope.type === 'player' ? 'Niveau max' : 'Dresseurs'} value={data.scope.type === 'player' ? detail.maxLevel : detail.owners} />
+                      <Stat label="Chanceux" value={detail.lucky} />
+                      <Stat label="Alphas" value={detail.alpha} />
+                    </div>
+                  ) : (
+                    <p className="text-sm text-slate-500">Pas encore capturé{data.scope.type === 'server' ? ' sur le serveur' : ''}.</p>
+                  )}
+                </div>
+              </Card>
             )}
           </div>
-          <Card title={<span className="flex items-center gap-2"><Star className="h-4 w-4 text-yellow-500" /> Meilleurs collectionneurs</span>} className="h-fit">
-            {data.collectors.length === 0 ? (
-              <Empty>Personne pour l’instant.</Empty>
-            ) : (
-              <ol className="space-y-1">
-                {data.collectors.map((c, i) => (
-                  <li key={c.name} className="flex items-center gap-2 text-sm">
-                    <span className="w-6 text-right font-semibold text-slate-500">{i + 1}</span>
-                    <span className="flex-1 font-medium">
-                      {c.publicId ? (
-                        <Link to={`/joueurs/${c.publicId}`} className="hover:text-accent">
-                          {c.name}
-                        </Link>
-                      ) : (
-                        c.name
-                      )}
-                    </span>
-                    <span className="tabular-nums">{c.pals}</span>
-                  </li>
-                ))}
-              </ol>
+
+          <div className="space-y-6">
+            <Card title={<span className="flex items-center gap-2"><Star className="h-4 w-4 text-yellow-500" /> Collectionneurs</span>}>
+              {data.collectors.length === 0 ? (
+                <Empty>Personne pour l’instant.</Empty>
+              ) : (
+                <ol className="space-y-0.5">
+                  {data.collectors.map((c, i) => (
+                    <li key={c.id}>
+                      <button
+                        onClick={() => go({ joueur: c.id, guilde: null })}
+                        className={cx('flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-left text-sm hover:bg-slate-100 dark:hover:bg-slate-800', joueur === c.id && 'bg-accent/10 text-accent')}
+                      >
+                        <span className="w-5 text-right font-semibold text-slate-500">{i + 1}</span>
+                        <span className="flex-1 truncate font-medium">{c.name}</span>
+                        <span className="text-xs tabular-nums text-slate-500" title={`${c.pals} Pals`}>
+                          {c.species} esp.
+                        </span>
+                      </button>
+                    </li>
+                  ))}
+                </ol>
+              )}
+            </Card>
+            {data.guilds.length > 0 && (
+              <Card title={<span className="flex items-center gap-2"><Castle className="h-4 w-4" /> Guildes</span>}>
+                <ol className="space-y-0.5">
+                  {data.guilds.map((g, i) => (
+                    <li key={g.id}>
+                      <button
+                        onClick={() => go({ guilde: g.id, joueur: null })}
+                        className={cx('flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-left text-sm hover:bg-slate-100 dark:hover:bg-slate-800', guilde === g.id && 'bg-accent/10 text-accent')}
+                      >
+                        <span className="w-5 text-right font-semibold text-slate-500">{i + 1}</span>
+                        <span className="flex-1 truncate font-medium">{g.name}</span>
+                        <span className="text-xs tabular-nums text-slate-500">{g.species} esp.</span>
+                      </button>
+                    </li>
+                  ))}
+                </ol>
+              </Card>
             )}
-          </Card>
+          </div>
         </div>
       )}
     </Page>
   );
 }
+
 
 // Événements
 

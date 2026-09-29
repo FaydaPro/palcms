@@ -24,6 +24,11 @@ Si Pocketpair demande le retrait de ce fichier, il suffit de le supprimer. Le CM
 - Tables de noms (en anglais) et coordonnées des points de voyage rapide et des tours de boss, extraites de [palworld-server-tool](https://github.com/zaigie/palworld-server-tool) (`web/src/assets`, licence Apache-2.0).
 - Les noms eux-mêmes appartiennent à Pocketpair, Inc.
 
+## Liste du Paldex — `packages/shared/src/paldex.json`
+
+- Numéros, noms et éléments des 288 Pals de Palworld 1.0, extraits des fichiers du jeu par [AlbertoJALJ/Palworld](https://github.com/AlbertoJALJ/Palworld) (`data/pals.json`). Seuls ces faits sont repris.
+- Les noms appartiennent à Pocketpair, Inc.
+
 ## Images des Pals — `apps/web/public/pals`
 
 - Icônes des Pals affichées dans le Paldex, reprises de [palworld-server-tool](https://github.com/zaigie/palworld-server-tool) (`web/src/assets/pals`).

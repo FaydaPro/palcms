@@ -5,3 +5,4 @@ export * from './iniLabels';
 export * from './permissions';
 export * from './features';
 export * from './mapCoords';
+export * from './paldexData';
