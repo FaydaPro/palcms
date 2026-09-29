@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { Activity, BookOpen, CalendarDays, Castle, Clock, Crown, Flag, Lightbulb, PartyPopper, Search, Sparkles, Star, Users } from 'lucide-react';
-import { api, errorText } from '../lib/api';
+import { api, errorText, url } from '../lib/api';
 import { useApp } from '../lib/app';
 import * as format from '../lib/format';
 import * as ui from '../components/ui';
@@ -160,6 +160,28 @@ export function GuildPage() {
 
 // Paldex
 
+/** Image du Pal (public/pals/<type>.png) ; si elle manque, un emplacement neutre la remplace. */
+export function PalIcon({ type, size = 48 }: { type: string; size?: number }) {
+  const [missing, setMissing] = useState(false);
+  const file = type.replace(/^boss_/i, '').toLowerCase();
+  return missing ? (
+    <span className="grid shrink-0 place-items-center rounded-lg bg-slate-100 text-lg dark:bg-slate-800" style={{ width: size, height: size }}>
+      🐾
+    </span>
+  ) : (
+    <img
+      src={url(`pals/${file}.png`)}
+      alt=""
+      loading="lazy"
+      width={size}
+      height={size}
+      onError={() => setMissing(true)}
+      className="shrink-0 rounded-lg bg-slate-100 object-contain dark:bg-slate-800"
+      style={{ width: size, height: size }}
+    />
+  );
+}
+
 interface Species {
   type: string;
   name: string;
@@ -216,7 +238,10 @@ export function PaldexPage() {
                 {list.map((s) => (
                   <div key={s.type} className="rounded-xl bg-white p-4 shadow-sm ring-1 ring-slate-200 dark:bg-slate-900 dark:ring-slate-800">
                     <div className="flex items-start justify-between gap-2">
-                      <p className="font-semibold">{s.name}</p>
+                      <div className="flex min-w-0 items-center gap-3">
+                        <PalIcon type={s.type} />
+                        <p className="truncate font-semibold">{s.name}</p>
+                      </div>
                       <span className="text-lg font-bold text-accent tabular-nums">{s.count}</span>
                     </div>
                     <p className="mt-1 text-xs text-slate-500">

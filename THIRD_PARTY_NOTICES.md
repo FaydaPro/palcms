@@ -24,6 +24,11 @@ Si Pocketpair demande le retrait de ce fichier, il suffit de le supprimer. Le CM
 - Tables de noms (en anglais) et coordonnées des points de voyage rapide et des tours de boss, extraites de [palworld-server-tool](https://github.com/zaigie/palworld-server-tool) (`web/src/assets`, licence Apache-2.0).
 - Les noms eux-mêmes appartiennent à Pocketpair, Inc.
 
+## Images des Pals — `apps/web/public/pals`
+
+- Icônes des Pals affichées dans le Paldex, reprises de [palworld-server-tool](https://github.com/zaigie/palworld-server-tool) (`web/src/assets/pals`).
+- **Droits** : **© Pocketpair, Inc.** Ces images ne sont **pas** couvertes par la licence MIT de PalCMS. Si leur retrait est demandé, il suffit de supprimer le dossier : le Paldex affiche alors un emplacement neutre à la place.
+
 ## Marques
 
 Palworld est une marque de Pocketpair, Inc. PalCMS est un projet indépendant, sans lien avec Pocketpair : il n'est ni affilié, ni approuvé, ni sponsorisé par cette société.
