@@ -22,6 +22,8 @@ La démo tourne entièrement dans le navigateur avec des données fictives (joue
 | ![Accueil](docs/screenshots/accueil.png) | ![Carte](docs/screenshots/carte.png) |
 | **Classement** | **Panel admin** |
 | ![Classement](docs/screenshots/classement.png) | ![Panel admin](docs/screenshots/admin.png) |
+| **Paldex** | |
+| ![Paldex](docs/screenshots/paldex.png) | |
 
 ---
 

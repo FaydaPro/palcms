@@ -166,6 +166,31 @@ function load(): Any {
 }
 
 let state: Any = load();
+
+// Modules ajoutés depuis la création de data.json (aussi pour une démo déjà enregistrée dans le navigateur)
+const NEW_MODULES = [
+  ['guilds', 'Guildes', 'Page publique des guildes : membres, niveau et bases sur la carte (lecture des sauvegardes).', 'public', true],
+  ['paldex', 'Paldex du serveur', 'Les 288 Pals façon boîte à Pals, par serveur, joueur et guilde (lecture des sauvegardes).', 'public', true],
+  ['character', 'Mon personnage', 'Les joueurs inscrits voient leurs Pals, leur inventaire et leur guilde.', 'public', true],
+  ['calendar', 'Calendrier des événements', 'Événements à venir sur le site, avec un compte à rebours sur l’accueil.', 'public', true],
+  ['uptime', 'Page de disponibilité', 'Disponibilité du serveur sur 30 jours, fréquentation et prochain redémarrage.', 'public', true],
+  ['tickets', 'Signalements et suggestions', 'Les joueurs inscrits signalent un problème ou proposent une idée à l’équipe.', 'public', true],
+  ['world', 'Données du monde', 'Lecture des sauvegardes : inventaires, Pals, guildes et bases.', 'server', false],
+  ['monitoring', 'Surveillance', 'Alertes, état des connexions, détection des plantages et statistiques de fréquentation.', 'server', false],
+  ['events', 'Événements et préréglages', 'Réglages temporaires programmés (week-end XP x3…) et préréglages de configuration.', 'server', false],
+] as const;
+for (const [id, name, description, area, toggleable] of NEW_MODULES) {
+  if (!state.modules.some((m: Any) => m.id === id)) state.modules.push({ id, name, description, area, toggleable, enabled: true });
+}
+for (const item of [
+  { label: 'Événements', url: '/evenements', after: '/actualites' },
+  { label: 'Guildes', url: '/guildes', after: '/carte' },
+  { label: 'Paldex', url: '/paldex', after: '/guildes' },
+]) {
+  if (state.site.menu.some((m: Any) => m.url === item.url)) continue;
+  const i = state.site.menu.findIndex((m: Any) => m.url === item.after);
+  state.site.menu.splice(i >= 0 ? i + 1 : state.site.menu.length, 0, { label: item.label, url: item.url });
+}
 // Lien direct vers /admin (ex. depuis le README) : on entre dans le panel sans passer par la connexion.
 if (!state.user && location.pathname.startsWith(`${import.meta.env.BASE_URL}admin`)) state.user = seed.adminUser;
 const players = createPlayers();
